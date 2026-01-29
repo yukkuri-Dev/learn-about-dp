@@ -1,0 +1,6 @@
+.vscode/
+build/
+*.o
+*.d01
+*.elf
+*.map

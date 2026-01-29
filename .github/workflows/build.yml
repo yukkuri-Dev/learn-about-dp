@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    tags: '*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: 'Tag Name to be created'
+
+jobs:
+  build:
+    name: Build EX-word addon
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build
+        run: |
+          cd ..
+          curl -sSfL https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz | tar -zxf -
+          cd -
+          DEVKITPRO="$OLDPWD/devkitPro" DEVKITSH4="$DEVKITPRO/devkitSH4" PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH" make
+          zip -r build.zip build
+
+      - name: Publish
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            gh release create "${{ inputs.tag }}" -t "${{ inputs.tag }}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
+          else
+            gh release create "${GITHUB_REF/refs\/*s\//}" -t "${GITHUB_REF/refs\/*s\//}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
+          fi

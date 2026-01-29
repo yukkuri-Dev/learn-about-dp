@@ -1,0 +1,50 @@
+.SUFFIXES:
+
+ifeq ($(strip $(DEVKITSH4)),)
+$(error "Please set DEVKITSH4 in your environment. export DEVKITSH4=<path to sdk>")
+endif
+include $(DEVKITSH4)/exword_rules
+
+TARGET       := hello
+MODNAME      := helloworld
+APPTITLE     := Hello, world!
+APPID        := HELLO
+APPMOD       := $(TARGET).d01
+
+SOURCEDIR    := src
+HTMLDIR      := html
+INSTALLDIR   := $(HOME)/.local/share/exword
+BUILDS       := ja cn
+EXCLUDE      :=
+CFILES       := $(filter-out $(EXCLUDE),$(wildcard $(SOURCEDIR)/*.c)) $(wildcard $(SOURCEDIR)/libc/*.c)
+SFILES       := $(wildcard $(SOURCEDIR)/*.s) $(wildcard $(SOURCEDIR)/libc/*.s)
+OBJECTS      := $(CFILES:.c=.o) $(SFILES:.s=.o)
+
+CC_OPTS      :=
+LDFLAGS      := -Wall -std=gnu17 -nostdlib -L$(DEVKITPRO)/libdataplus/lib -ldataplus -lgraphics -lsh4a
+CFLAGS       := -Wall -std=gnu17 -fno-builtin -I$(DEVKITPRO)/libdataplus/include -I$(SOURCEDIR) -I$(SOURCEDIR)/libc/include -O3 $(CC_OPTS)
+ASFLAGS      := -Wall -std=gnu17 -m4-nofpu
+
+app: $(addprefix build/,$(addsuffix /$(APPID),$(BUILDS)))
+
+.SECONDEXPANSION:
+build/%/$(APPID): $(TARGET).d01 $$(wildcard $(HTMLDIR)/$$*/*.htm)
+	@echo building $* version in $@...
+	@mkdir -p $@
+	@cp $(TARGET).d01 $@
+	@for f in $(HTMLDIR)/$*/*.htm; do \
+		sed -e 's/@APPTITLE/$(APPTITLE)/g' -e 's/@APPID/$(APPID)/g' -e 's/@APPMOD/$(APPMOD)/g' $$f > $@/$$(basename $$f); \
+	done
+	@touch $@/fileinfo.cji
+
+$(TARGET).elf: $(OBJECTS)
+
+install: app
+	@echo installing to $(INSTALLDIR)...
+	@mkdir -p $(INSTALLDIR)
+	@cp -r build/* $(INSTALLDIR)/
+	@echo 'You can now install this app to EX-word by `dict install $(APPID)` in libexword.'
+
+clean:
+	@echo clean $(OBJECTS) $(TARGET).elf $(TARGET).elf.map $(TARGET).d01
+	@rm -fr build $(OBJECTS) $(TARGET).elf $(TARGET).elf.map $(TARGET).d01
