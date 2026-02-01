@@ -58,6 +58,9 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     // フォントを取得
     fnt = get_font();
+    if (fnt == NULL) {
+        return -1;  // フォント取得失敗
+    }
     
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
@@ -95,15 +98,18 @@ reload_directory:  // ディレクトリ再読み込みのラベル
         // 最初のページを描画
         // ".." エントリを先頭に追加（ルートでない場合）
         if (strcmp(real_path, drive[0]) != 0 && strcmp(real_path, drive[1]) != 0) {
-          // 既存のファイルを1つ後ろにシフト
-          for (int i = total_files; i > 0; i--) {
-            strcpy(file_list[i].name, file_list[i-1].name);
-            file_list[i].type = file_list[i-1].type;
+          // バッファオーバーフローを防ぐ
+          if (total_files < MAX_FILES) {
+              // 既存のファイルを1つ後ろにシフト
+              for (int i = total_files; i > 0; i--) {
+                strcpy(file_list[i].name, file_list[i-1].name);
+                file_list[i].type = file_list[i-1].type;
+              }
+              // 先頭に ".." を追加
+              strcpy(file_list[0].name, "..");
+              file_list[0].type = 0;  // ディレクトリタイプ
+              total_files++;
           }
-          // 先頭に ".." を追加
-          strcpy(file_list[0].name, "..");
-          file_list[0].type = 0;  // ディレクトリタイプ
-          total_files++;
         }
         for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
             set_pen(create_rgb16(255, 255, 255));
@@ -173,8 +179,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                     size_t len = strlen(real_path);
                     size_t name_len = strlen(file_list[selected_index].name);
                     
-                    // バッファオーバーフローを防ぐ
-                    if (len + name_len + 2 < sizeof(real_path)) {
+                    // バッファオーバーフローを防ぐ (real_pathは128バイト)
+                    if (len + name_len + 2 < 128) {
                         // パスの最後に\があるか確認
                         if (len > 0 && real_path[len - 1] != '\\') {
                             strcat(real_path, "\\");
