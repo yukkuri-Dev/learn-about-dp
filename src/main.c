@@ -26,6 +26,7 @@ int scroll_offset = 0;
 char filename[64];
 unsigned long type;
 char search_path[128];
+char real_path[128];  // グローバル変数に変更
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -37,11 +38,19 @@ static char *drive[2] = {
 
 int main(void) {
     char path[128];
-    char real_path[128];
     struct font *fnt = get_font();
     int y_pos = 30;  // 描画開始Y座標
     char display_name[80];  // 表示用バッファ
     strcpy(real_path, drive[0]);  // 初期パスを内蔵ドライブに設定
+    
+reload_directory:  // ディレクトリ再読み込みのラベル
+    // グローバル変数をリセット
+    total_files = 0;
+    scroll_offset = 0;
+    selected_index = 0;
+    prev_selected_index = 0;
+    refresh_needed = 1;
+    
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -92,11 +101,14 @@ int main(void) {
             set_pen(create_rgb16(255, 255, 255));
             
             if (file_list[i].type == 0) {
+                // type == 0 はディレクトリ
                 sprintf(display_name, "[DIR]  %s", file_list[i].name);
             } else if (file_list[i].type == 1) {
+                // type == 1 はファイル
                 sprintf(display_name, "[FILE] %s", file_list[i].name);
             } else {
-                sprintf(display_name, "[?]    %s", file_list[i].name);
+                // それ以外は不明
+                sprintf(display_name, "[%lu]    %s",file_list[i].type, file_list[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_name);
@@ -144,22 +156,22 @@ int main(void) {
                 if (strcmp(file_list[selected_index].name, "..") == 0) {
                     // 親ディレクトリに移動
                     char *last_sep = strrchr(real_path, '\\');
-                    if (last_sep != NULL && last_sep != real_path + 2) { // ルート直下でない場合
+                    // ルートディレクトリではない場合のみ移動
+                    if (last_sep != NULL && last_sep > real_path + 5) {
                         *last_sep = '\0'; // 最後のセパレータ以降を削除
-                    } else {
-                        // ルート直下の場合はドライブルートに戻す
-                        strcpy(real_path, drive[0]);
                     }
                 } else {
                     // サブディレクトリに移動
-                    if (strcmp(real_path, drive[0]) != 0 && strcmp(real_path, drive[1]) != 0) {
+                    // パスの最後に\があるか確認
+                    size_t len = strlen(real_path);
+                    if (len > 0 && real_path[len - 1] != '\\') {
                         strcat(real_path, "\\");
                     }
                     strcat(real_path, file_list[selected_index].name);
                 }
                 
-                // 再初期化のため、main関数を再呼び出し
-                return main();
+                // ディレクトリを再読み込み
+                goto reload_directory;
             }
             // ファイルの場合は何もしない（将来的にファイル操作を追加可能）
             while (get_key_state(KEY_ENTER))
@@ -187,7 +199,7 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
@@ -220,7 +232,7 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
