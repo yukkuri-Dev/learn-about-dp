@@ -37,8 +37,9 @@ static char *drive[2] = {
 };
 
 int main(void) {
+    memmgr_init();
     size_t path_len = strlen(drive[0]) + strlen("*") + 1;
-    char *path = malloc(path_len);
+    char *path = memmgr_alloc(path_len);
     if (path == NULL) {
       set_pen(create_rgb16(255, 0, 0));  // 赤色
       render_text(10, 10, "Memory allocation failed!");
@@ -46,7 +47,7 @@ int main(void) {
       while (1) {
         keypad_read();
         if (get_key_state(KEY_POWER)) {
-            free(path);
+            memmgr_free(path);
             return -2;
         }
       }
@@ -136,7 +137,7 @@ int main(void) {
     while (1) {
         keypad_read();
         if (get_key_state(KEY_POWER)) {
-            free(path);
+            memmgr_free(path);
             return -2;
         }
         if (get_key_state(KEY_BACK)){
