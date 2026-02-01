@@ -133,7 +133,7 @@ int main(void) {
     
     // 終了メッセージ
     set_pen(create_rgb16(0, 255, 0));  // 緑色
-    char *exit_msg = "Press POWER to exit.";
+    char *exit_msg = "Press POWER to exit. Press BACK to root.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
         SCREEN_HEIGHT - fnt->height - 10,
