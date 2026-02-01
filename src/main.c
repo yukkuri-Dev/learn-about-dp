@@ -164,22 +164,57 @@ int main(void) {
           char *selected_file = get_selected_filename();
           unsigned long selected_type = get_selected_filetype();
           
-          if (selected_file != NULL) {
-              // デバッグ表示：選択されたファイル情報を表示
-              set_pen(create_rgb16(0, 0, 0));
-              draw_rect(10, SCREEN_HEIGHT - 40, SCREEN_WIDTH - 20, 30);
-              set_pen(create_rgb16(255, 255, 0));
-              
-              if (selected_type == 5) {
-                  sprintf(display_name, "Selected: [DIR] %s", selected_file);
-              } else if (selected_type == 1) {
-                  sprintf(display_name, "Selected: [FILE] %s", selected_file);
-              } else {
-                  sprintf(display_name, "Selected: %s", selected_file);
+          if (selected_file != NULL && selected_type == 5) {
+              // ディレクトリの場合、そのディレクトリに移動
+              char *new_path = memmgr_alloc(256);
+              if (new_path != NULL) {
+                  strcpy(new_path, path);
+                  strcat(new_path, selected_file);
+                  strcat(new_path, "\\");
+                  
+                  // 新しいディレクトリのファイル一覧を読み込む
+                  total_files = 0;
+                  selected_index = 0;
+                  prev_selected_index = 0;
+                  scroll_offset = 0;
+                  
+                  ret = sys_findfirst(new_path, &handle, filename, &type);
+                  while (ret == 0 && total_files < MAX_FILES) {
+                      strncpy(file_list[total_files].name, filename, 63);
+                      file_list[total_files].name[63] = '\0';
+                      file_list[total_files].type = type;
+                      total_files++;
+                      ret = sys_findnext(handle, filename, &type);
+                  }
+                  sys_findclose(handle);
+                  
+                  // pathを更新
+                  strcpy(path, new_path);
+                  memmgr_free(new_path);
+                  
+                  // 画面全体を再描画
+                  set_pen(create_rgb16(0, 0, 0));
+                  draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+                  
+                  // ヘッダーを表示
+                  set_pen(create_rgb16(255, 255, 255));
+                  render_text(10, 10, path);
+                  
+                  // ファイル一覧を表示
+                  for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+                      set_pen(create_rgb16(255, 255, 255));
+                      if (file_list[i].type == 5) {
+                          sprintf(display_name, "[DIR]  %s", file_list[i].name);
+                      } else if (file_list[i].type == 1) {
+                          sprintf(display_name, "[FILE] %s", file_list[i].name);
+                      } else {
+                          sprintf(display_name, "[?]    %s", file_list[i].name);
+                      }
+                      render_text(10, 30 + i * (fnt->height + 2), display_name);
+                  }
+                  
+                  refresh_needed = 1;
               }
-              
-              render_text(10, SCREEN_HEIGHT - 35, display_name);
-              lcdc_copy_vram();
           }
           
           while (get_key_state(KEY_ENTER))
@@ -237,8 +272,9 @@ int main(void) {
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 5) {
                           sprintf(display_name, "[DIR]  %s", file_list[idx].name);
+                          memmgr_free(path);
                       } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
+                          sprintf(display_name, "FM isn't any type open file: %s", file_list[idx].name);
                       } else {
                           sprintf(display_name, "[?]    %s", file_list[idx].name);
                       }
