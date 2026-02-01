@@ -28,6 +28,8 @@ char filename[64];
 unsigned long type;
 char search_path[128];
 char real_path[128] = "";  // 空文字列で初期化
+char path_buffer[128];      // グローバルに移動
+char display_buffer[80];    // グローバルに移動
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -38,10 +40,23 @@ static char *drive[2] = {
 };
 
 int main(void) {
-    char path[128];
     struct font *fnt;
     int y_pos = 30;  // 描画開始Y座標
-    char display_name[80];  // 表示用バッファ
+    
+    // まず画面を初期化してクラッシュポイントを特定
+    set_pen(create_rgb16(255, 255, 255));
+    draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lcdc_copy_vram();
+    
+    // フォントを取得
+    fnt = get_font();
+    if (fnt == NULL) {
+        // フォント取得失敗の場合は赤い画面を表示
+        set_pen(create_rgb16(255, 0, 0));
+        draw_rect(0, 0, 100, 100);
+        lcdc_copy_vram();
+        while(1) { keypad_read(); if(get_key_state(KEY_POWER)) return -1; }
+    }
     
     // 初回のみ初期パスを設定
     if (real_path[0] == '\0') {
@@ -56,20 +71,14 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     prev_selected_index = 0;
     refresh_needed = 1;
     
-    // フォントを取得
-    fnt = get_font();
-    if (fnt == NULL) {
-        return -1;  // フォント取得失敗
-    }
-    
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    sprintf(path, "===File Manager - path:%s", real_path);
-    render_text(10, 10, path);
+    snprintf(path_buffer, sizeof(path_buffer), "===File Manager - path:%s", real_path);
+    render_text(10, 10, path_buffer);
     
     // 検索パスを構築（ルートディレクトリのすべてのファイル）
     sprintf(search_path, "%s*", real_path);
@@ -116,22 +125,22 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             
             if (file_list[i].type == 0) {
                 // type == 0 はディレクトリ
-                sprintf(display_name, "[DIR]  %s", file_list[i].name);
+                snprintf(display_buffer, sizeof(display_buffer), "[DIR]  %.50s", file_list[i].name);
             } else if (file_list[i].type == 1) {
                 // type == 1 はファイル
-                sprintf(display_name, "[FILE] %s", file_list[i].name);
+                snprintf(display_buffer, sizeof(display_buffer), "[FILE] %.50s", file_list[i].name);
             } else {
                 // それ以外は不明
-                sprintf(display_name, "[%lu]    %s",file_list[i].type, file_list[i].name);
+                snprintf(display_buffer, sizeof(display_buffer), "[%lu]    %.50s",file_list[i].type, file_list[i].name);
             }
             
-            render_text(10, y_pos + i * (fnt->height + 2), display_name);
+            render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
         }
         
         // ファイル数を表示
         set_pen(create_rgb16(0, 255, 255));  // シアン
-        sprintf(display_name, "Total: %d files", total_files);
-        render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_name);
+        snprintf(display_buffer, sizeof(display_buffer), "Total: %d files", total_files);
+        render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_buffer);
         
     } else {
         // ファイルが見つからなかった
@@ -214,13 +223,13 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 0) {
-                          sprintf(display_name, "[DIR]  %s", file_list[idx].name);
+                          sprintf(display_buffer, "[DIR]  %s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
+                          sprintf(display_buffer, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
+                          sprintf(display_buffer, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
                       }
-                      render_text(10, 30 + i * (fnt->height + 2), display_name);
+                      render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
               }
               
@@ -247,13 +256,13 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 0) {
-                          sprintf(display_name, "[DIR]  %s", file_list[idx].name);
+                          snprintf(display_buffer, sizeof(display_buffer), "[DIR]  %.50s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
+                          snprintf(display_buffer, sizeof(display_buffer), "[FILE] %.50s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
+                          snprintf(display_buffer, sizeof(display_buffer), "[%lu]    %.50s", file_list[idx].type, file_list[idx].name);
                       }
-                      render_text(10, 30 + i * (fnt->height + 2), display_name);
+                      render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
               }
               
@@ -284,8 +293,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             set_pen(create_rgb16(0, 0, 0));
             draw_rect(400, 10, 120, 20);  // 前の情報を消去
             set_pen(create_rgb16(255, 255, 255));
-            sprintf(display_name, "Sel: %d/%d", selected_index + 1, total_files);
-            render_text(400, 10, display_name);
+            snprintf(display_buffer, sizeof(display_buffer), "Sel: %d/%d", selected_index + 1, total_files);
+            render_text(400, 10, display_buffer);
             
             lcdc_copy_vram();
             refresh_needed = 0;
