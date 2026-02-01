@@ -8,7 +8,10 @@ on:
       tag:
         type: string
         description: 'Tag Name to be created'
-
+        push:
+          branches:
+            - main
+            - master
 jobs:
   build:
     name: Build EX-word addon
