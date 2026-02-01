@@ -16,7 +16,7 @@ char filename[64];
 unsigned long type;
 char search_path[128];
 int ret, handle;
-
+int selected_index = 0;
 static char *drive[2] = {
     "\\\\drv0\\",  // 内蔵ドライブ
     "\\\\crd0\\"   // SDカード
@@ -112,5 +112,28 @@ int main(void) {
         if (get_key_state(KEY_POWER) || get_key_state(KEY_BACK)) {
             return -2;
         }
+        if (get_key_state(KEY_UP)){
+          if (selected_index > 0) {
+              selected_index--;
+              lcdc_copy_vram();
+              while (get_key_state(KEY_UP))
+              {
+                  keypad_read();
+              }
+          }
+        }
+        if (get_key_state(KEY_DOWN)){
+          if (selected_index < file_count - 1) {
+              selected_index++;
+              lcdc_copy_vram();
+              while (get_key_state(KEY_DOWN))
+              {
+                  keypad_read();
+              }
+              
+          }
+        }
+        set_pen(create_rgb16(0, 0, 255));  // 青色
+        render_text(0, selected_index * (fnt->height + 2) + 30, ">");  // 選択インジケータ
     }
 }
