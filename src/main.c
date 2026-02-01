@@ -167,10 +167,21 @@ int main(void) {
           if (selected_file != NULL && selected_type == 5) {
               // ディレクトリの場合、そのディレクトリに移動
               char *new_path = memmgr_alloc(256);
-              if (new_path != NULL) {
+              char *search_str = memmgr_alloc(256);
+              if (new_path != NULL && search_str != NULL) {
+                  // 現在のpathから"*"を除去してディレクトリパスを取得
                   strcpy(new_path, path);
+                  char *star_pos = strchr(new_path, '*');
+                  if (star_pos != NULL) {
+                      *star_pos = '\0';
+                  }
+                  
+                  // 選択したディレクトリを追加
                   strcat(new_path, selected_file);
                   strcat(new_path, "\\");
+                  
+                  // 検索用のパスを作成（"*"付き）
+                  sprintf(search_str, "%s*", new_path);
                   
                   // 新しいディレクトリのファイル一覧を読み込む
                   total_files = 0;
@@ -178,41 +189,65 @@ int main(void) {
                   prev_selected_index = 0;
                   scroll_offset = 0;
                   
-                  ret = sys_findfirst(new_path, &handle, filename, &type);
-                  while (ret == 0 && total_files < MAX_FILES) {
+                  ret = sys_findfirst(search_str, &handle, filename, &type);
+                  if (ret == 0) {
+                      // 最初のファイルを保存
                       strncpy(file_list[total_files].name, filename, 63);
                       file_list[total_files].name[63] = '\0';
                       file_list[total_files].type = type;
                       total_files++;
-                      ret = sys_findnext(handle, filename, &type);
+                      
+                      // 残りのファイルを読み込む
+                      while (total_files < MAX_FILES) {
+                          ret = sys_findnext(handle, filename, &type);
+                          if (ret != 0) break;
+                          strncpy(file_list[total_files].name, filename, 63);
+                          file_list[total_files].name[63] = '\0';
+                          file_list[total_files].type = type;
+                          total_files++;
+                      }
+                      sys_findclose(handle);
                   }
-                  sys_findclose(handle);
                   
                   // pathを更新
-                  strcpy(path, new_path);
+                  strcpy(path, search_str);
                   memmgr_free(new_path);
+                  memmgr_free(search_str);
                   
                   // 画面全体を再描画
                   set_pen(create_rgb16(0, 0, 0));
                   draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
                   
                   // ヘッダーを表示
-                  set_pen(create_rgb16(255, 255, 255));
-                  render_text(10, 10, path);
+                  set_pen(create_rgb16(255, 255, 0));
+                  sprintf(display_name, "=== File List: %s ===", path);
+                  render_text(10, 10, display_name);
                   
-                  // ファイル一覧を表示
-                  for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
-                      set_pen(create_rgb16(255, 255, 255));
-                      if (file_list[i].type == 5) {
-                          sprintf(display_name, "[DIR]  %s", file_list[i].name);
-                      } else if (file_list[i].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[i].name);
-                      } else {
-                          sprintf(display_name, "[?]    %s", file_list[i].name);
+                  if (total_files > 0) {
+                      // ファイル一覧を表示
+                      for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+                          set_pen(create_rgb16(255, 255, 255));
+                          if (file_list[i].type == 5) {
+                              sprintf(display_name, "[DIR]  %s", file_list[i].name);
+                          } else if (file_list[i].type == 1) {
+                              sprintf(display_name, "[FILE] %s", file_list[i].name);
+                          } else {
+                              sprintf(display_name, "[?]    %s", file_list[i].name);
+                          }
+                          render_text(10, 30 + i * (fnt->height + 2), display_name);
                       }
-                      render_text(10, 30 + i * (fnt->height + 2), display_name);
+                      
+                      // ファイル数を表示
+                      set_pen(create_rgb16(0, 255, 255));
+                      sprintf(display_name, "Total: %d files", total_files);
+                      render_text(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name);
+                  } else {
+                      // ファイルが見つからなかった
+                      set_pen(create_rgb16(255, 0, 0));
+                      render_text(10, 30, "No files found in this directory");
                   }
                   
+                  lcdc_copy_vram();
                   refresh_needed = 1;
               }
           }
@@ -272,9 +307,8 @@ int main(void) {
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 5) {
                           sprintf(display_name, "[DIR]  %s", file_list[idx].name);
-                          memmgr_free(path);
                       } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "FM isn't any type open file: %s", file_list[idx].name);
+                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
                           sprintf(display_name, "[?]    %s", file_list[idx].name);
                       }
