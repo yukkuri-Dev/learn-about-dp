@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syscalls/syscalls.h>
-#include "../libc/memmgr.h"
+#include <memmgr.h>
 
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
