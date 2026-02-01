@@ -1,7 +1,9 @@
-name: Build
-
+name: Build and Release EX-word Addon
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - '*'
   workflow_dispatch:
@@ -10,6 +12,7 @@ on:
         type: string
         description: 'Tag name to be created (optional)'
         required: false
+
 
 jobs:
   build:
