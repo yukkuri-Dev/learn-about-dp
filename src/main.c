@@ -12,12 +12,12 @@
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
-#define MAX_FILES 30    // 読み込む最大ファイル数（メモリ削減のため30に）
+#define MAX_FILES 15    // 読み込む最大ファイル数（メモリ削減のため15に）
 
 // ファイル情報を保存する構造体
 struct file_entry {
-    char name[32];  // 64→32に削減（メモリ削減）
-    unsigned long type;
+    char name[24];  // 32→24に削減（メモリ削減）
+    unsigned char type;  // unsigned long→unsigned charに変更（4→1バイト）
 };
 
 struct file_entry file_list[MAX_FILES];
@@ -26,10 +26,10 @@ int scroll_offset = 0;
 
 char filename[64];
 unsigned long type;
-char search_path[64];      // 128→64に削減
-char real_path[64] = "";   // 128→64に削減
-char path_buffer[64];      // 128→64に削減
-char display_buffer[64];   // 80→64に削減
+char search_path[48];      // 64→48に削減
+char real_path[48] = "";   // 64→48に削減
+char path_buffer[48];      // 64→48に削減
+char display_buffer[48];   // 64→48に削減
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -77,7 +77,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    sprintf(path_buffer, "===%.55s", real_path);
+    sprintf(path_buffer, "===%.40s", real_path);
     render_text(10, 10, path_buffer);
     
     // 検索パスを構築（ルートディレクトリのすべてのファイル）
@@ -88,9 +88,9 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     if (ret == 0) {
         // 最初のファイルを保存
-        strncpy(file_list[total_files].name, filename, 31);
-        file_list[total_files].name[31] = '\0';  // NULL終端を保証
-        file_list[total_files].type = type;
+        strncpy(file_list[total_files].name, filename, 23);
+        file_list[total_files].name[23] = '\0';  // NULL終端を保証
+        file_list[total_files].type = (unsigned char)type;
         total_files++;
         
         // 残りのファイルを順次取得して保存
@@ -98,9 +98,9 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             ret = sys_findnext(handle, filename, &type);
             if (ret != 0) break;
             
-            strncpy(file_list[total_files].name, filename, 31);
-            file_list[total_files].name[31] = '\0';  // NULL終端を保証
-            file_list[total_files].type = type;
+            strncpy(file_list[total_files].name, filename, 23);
+            file_list[total_files].name[23] = '\0';  // NULL終端を保証
+            file_list[total_files].type = (unsigned char)type;
             total_files++;
         }
         
@@ -141,7 +141,11 @@ reload_directory:  // ディレクトリ再読み込みのラベル
         
         // ファイル数を表示
         set_pen(create_rgb16(0, 255, 255));  // シアン
-        sprintf(display_buffer, "Total: %d files", total_files);
+        if (total_files >= MAX_FILES) {
+            sprintf(display_buffer, "%d+ files", total_files);
+        } else {
+            sprintf(display_buffer, "%d files", total_files);
+        }
         render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_buffer);
         
     } else {
@@ -190,8 +194,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                     size_t len = strlen(real_path);
                     size_t name_len = strlen(file_list[selected_index].name);
                     
-                    // バッファオーバーフローを防ぐ (real_pathは64バイト)
-                    if (len + name_len + 2 < 64) {
+                    // バッファオーバーフローを防ぐ (real_pathは48バイト)
+                    if (len + name_len + 2 < 48) {
                         // パスの最後に\があるか確認
                         if (len > 0 && real_path[len - 1] != '\\') {
                             strcat(real_path, "\\");
