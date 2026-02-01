@@ -17,6 +17,8 @@ unsigned long type;
 char search_path[128];
 int ret, handle;
 int selected_index = 0;
+int prev_selected_index = 0;
+int refresh_needed = 1;
 static char *drive[2] = {
     "\\\\drv0\\",  // 内蔵ドライブ
     "\\\\crd0\\"   // SDカード
@@ -103,6 +105,12 @@ int main(void) {
         exit_msg
     );
     
+    // 初期カーソルを描画
+    if (file_count > 0) {
+        set_pen(create_rgb16(0, 0, 255));  // 青色
+        render_text(0, 30, ">");  // 最初の項目にカーソル
+    }
+    
     // VRAMにコピー（画面に反映）
     lcdc_copy_vram();
     
@@ -114,8 +122,9 @@ int main(void) {
         }
         if (get_key_state(KEY_UP)){
           if (selected_index > 0) {
+              prev_selected_index = selected_index;
               selected_index--;
-              lcdc_copy_vram();
+              refresh_needed = 1;
               while (get_key_state(KEY_UP))
               {
                   keypad_read();
@@ -124,8 +133,9 @@ int main(void) {
         }
         if (get_key_state(KEY_DOWN)){
           if (selected_index < file_count - 1) {
+              prev_selected_index = selected_index;
               selected_index++;
-              lcdc_copy_vram();
+              refresh_needed = 1;
               while (get_key_state(KEY_DOWN))
               {
                   keypad_read();
@@ -133,7 +143,24 @@ int main(void) {
               
           }
         }
-        set_pen(create_rgb16(0, 0, 255));  // 青色
-        render_text(0, selected_index * (fnt->height + 2) + 30, ">");  // 選択インジケータ
+        if (refresh_needed) {
+            // 前のカーソルを消去（黒で上書き）
+            set_pen(create_rgb16(0, 0, 0));
+            render_text(0, prev_selected_index * (fnt->height + 2) + 30, ">");
+            
+            // 新しいカーソルを描画
+            set_pen(create_rgb16(0, 0, 255));  // 青色
+            render_text(0, selected_index * (fnt->height + 2) + 30, ">");  // 選択インジケータ
+            
+            // デバッグ情報を表示（オプション）
+            set_pen(create_rgb16(0, 0, 0));
+            draw_rect(400, 10, 120, 20);  // 前の情報を消去
+            set_pen(create_rgb16(255, 255, 255));
+            sprintf(display_name, "Sel: %d/%d", selected_index + 1, file_count);
+            render_text(400, 10, display_name);
+            
+            lcdc_copy_vram();
+            refresh_needed = 0;
+        }
     }
 }
