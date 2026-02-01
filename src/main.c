@@ -3,6 +3,7 @@
 #include <graphics/text.h>
 #include <graphics/lcdc.h>
 #include <sh4a/input/keypad.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -52,7 +53,7 @@ int main(void) {
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
     sprintf(display_name, "=== File List: %s ===", drive[0]);  
-    render_text(10, 10, display_name);  // ✅ display_nameを表示
+    render_text(10, 10, display_name);  //display_nameを表示
 
     // この行は削除（上で既にpathを作っている）
     // sprintf(search_path, "%s*", drive[0]);  ← 削除
@@ -106,7 +107,7 @@ int main(void) {
     
     // 終了メッセージ
     set_pen(create_rgb16(0, 255, 0));  // 緑色
-    const char *exit_msg = "Press POWER.";
+    char *exit_msg = "Press POWER.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
         SCREEN_HEIGHT - fnt->height - 10,
