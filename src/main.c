@@ -81,7 +81,7 @@ int main(void) {
             } else if (file_list[i].type == 1) {
                 sprintf(display_name, "[FILE] %s", file_list[i].name);
             } else {
-                sprintf(display_name, "[?]    %s", file_list[i].name);
+                sprintf(display_name, "[%lu]    %s",file_list[i].type ,file_list[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_name);
@@ -142,7 +142,7 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s",file_list[idx].type ,file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
@@ -175,7 +175,7 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s",file_list[idx].type ,file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
