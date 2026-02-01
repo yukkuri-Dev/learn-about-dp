@@ -40,7 +40,16 @@ int main(void) {
     size_t path_len = strlen(drive[0]) + strlen("*") + 1;
     char *path = malloc(path_len);
     if (path == NULL) {
-        return -2;  // メモリ確保失敗
+      set_pen(create_rgb16(255, 0, 0));  // 赤色
+      render_text(10, 10, "Memory allocation failed!");
+      lcdc_copy_vram();
+      while (1) {
+        keypad_read();
+        if (get_key_state(KEY_POWER)) {
+            free(path);
+            return -2;
+        }
+      }
     }
     struct font *fnt = get_font();
     int y_pos = 30;  // 描画開始Y座標
