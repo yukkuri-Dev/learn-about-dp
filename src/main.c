@@ -12,11 +12,11 @@
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
-#define MAX_FILES 100   // 読み込む最大ファイル数
+#define MAX_FILES 30    // 読み込む最大ファイル数（メモリ削減のため30に）
 
 // ファイル情報を保存する構造体
 struct file_entry {
-    char name[64];
+    char name[32];  // 64→32に削減（メモリ削減）
     unsigned long type;
 };
 
@@ -26,10 +26,10 @@ int scroll_offset = 0;
 
 char filename[64];
 unsigned long type;
-char search_path[128];
-char real_path[128] = "";  // 空文字列で初期化
-char path_buffer[128];      // グローバルに移動
-char display_buffer[80];    // グローバルに移動
+char search_path[64];      // 128→64に削減
+char real_path[64] = "";   // 128→64に削減
+char path_buffer[64];      // 128→64に削減
+char display_buffer[64];   // 80→64に削減
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -77,7 +77,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    sprintf(path_buffer, "===File Manager - path:%.90s", real_path);
+    sprintf(path_buffer, "===%.55s", real_path);
     render_text(10, 10, path_buffer);
     
     // 検索パスを構築（ルートディレクトリのすべてのファイル）
@@ -88,7 +88,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     if (ret == 0) {
         // 最初のファイルを保存
-        strcpy(file_list[total_files].name, filename);
+        strncpy(file_list[total_files].name, filename, 31);
+        file_list[total_files].name[31] = '\0';  // NULL終端を保証
         file_list[total_files].type = type;
         total_files++;
         
@@ -97,7 +98,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             ret = sys_findnext(handle, filename, &type);
             if (ret != 0) break;
             
-            strcpy(file_list[total_files].name, filename);
+            strncpy(file_list[total_files].name, filename, 31);
+            file_list[total_files].name[31] = '\0';  // NULL終端を保証
             file_list[total_files].type = type;
             total_files++;
         }
@@ -125,13 +127,13 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             
             if (file_list[i].type == 0) {
                 // type == 0 はディレクトリ
-                sprintf(display_buffer, "[DIR]  %.50s", file_list[i].name);
+                sprintf(display_buffer, "[DIR]  %s", file_list[i].name);
             } else if (file_list[i].type == 1) {
                 // type == 1 はファイル
-                sprintf(display_buffer, "[FILE] %.50s", file_list[i].name);
+                sprintf(display_buffer, "[FILE] %s", file_list[i].name);
             } else {
                 // それ以外は不明
-                sprintf(display_buffer, "[%lu]    %.50s",file_list[i].type, file_list[i].name);
+                sprintf(display_buffer, "[%lu]    %s",file_list[i].type, file_list[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
@@ -188,8 +190,8 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                     size_t len = strlen(real_path);
                     size_t name_len = strlen(file_list[selected_index].name);
                     
-                    // バッファオーバーフローを防ぐ (real_pathは128バイト)
-                    if (len + name_len + 2 < 128) {
+                    // バッファオーバーフローを防ぐ (real_pathは64バイト)
+                    if (len + name_len + 2 < 64) {
                         // パスの最後に\があるか確認
                         if (len > 0 && real_path[len - 1] != '\\') {
                             strcat(real_path, "\\");
@@ -256,11 +258,11 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 0) {
-                          sprintf(display_buffer, "[DIR]  %.50s", file_list[idx].name);
+                          sprintf(display_buffer, "[DIR]  %s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
-                          sprintf(display_buffer, "[FILE] %.50s", file_list[idx].name);
+                          sprintf(display_buffer, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_buffer, "[%lu]    %.50s", file_list[idx].type, file_list[idx].name);
+                          sprintf(display_buffer, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
