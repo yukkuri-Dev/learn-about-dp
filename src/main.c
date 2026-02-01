@@ -8,20 +8,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syscalls/syscalls.h>
+#include "../libc/memmgr.h"
 
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
 
-// グローバル配列を削除 - メモリ削減のため
+// グローバル変数（最小限）
 int total_files = 0;
 int scroll_offset = 0;
-
-char filename[32];        // 64→32に削減
-unsigned long type;
-char search_path[48];
 char real_path[48] = "";
-int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
 int refresh_needed = 1;
@@ -109,6 +105,23 @@ int main(void) {
     int y_pos = 30;
     char *path_buffer = NULL;      // 動的確保
     char *display_buffer = NULL;   // 動的確保
+    char temp_name[32];            // 再利用される一時変数
+    unsigned long temp_type;       // 再利用される一時変数
+    char selected_name[32];        // 選択されたファイル名
+    unsigned long selected_type;   // 選択されたファイル型
+    int idx;                       // インデックス
+    int screen_pos;                // スクリーン上の位置
+    int prev_screen_pos;           // 前のスクリーン上の位置
+    size_t len, name_len;          // 文字列長
+    char *last_sep;                // 最後のセパレータ
+    
+    // メモリマネージャを初期化（malloc使用前に必須）
+    memmgr_init();
+    
+    // まず画面を初期化（malloc前に初期化が必要）
+    set_pen(create_rgb16(255, 255, 255));
+    draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lcdc_copy_vram();
     
     // 動的にメモリ確保
     path_buffer = (char*)malloc(48);
@@ -122,11 +135,6 @@ int main(void) {
         if (display_buffer) free(display_buffer);
         while(1) { keypad_read(); if(get_key_state(KEY_POWER)) return -1; }
     }
-    
-    // まず画面を初期化
-    set_pen(create_rgb16(255, 255, 255));
-    draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    lcdc_copy_vram();
     
     // フォントを取得
     fnt = get_font();
@@ -164,22 +172,21 @@ reload_directory:
     total_files = count_files(real_path);
     
     // 最初のページを描画（必要な分だけファイル情報を取得）
-    for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
-        char temp_name[32];
-        unsigned long temp_type;
-        
-        if (get_file_at_index(real_path, i, temp_name, &temp_type) == 0) {
-            set_pen(create_rgb16(255, 255, 255));
-            
-            if (temp_type == 0) {
-                sprintf(display_buffer, "[DIR]  %s", temp_name);
-            } else if (temp_type == 1) {
-                sprintf(display_buffer, "[FILE] %s", temp_name);
-            } else {
-                sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
+    if (total_files > 0) {
+        for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+            if (get_file_at_index(real_path, i, temp_name, &temp_type) == 0) {
+                set_pen(create_rgb16(255, 255, 255));
+                
+                if (temp_type == 0) {
+                    sprintf(display_buffer, "[DIR]  %.36s", temp_name);
+                } else if (temp_type == 1) {
+                    sprintf(display_buffer, "[FILE] %.36s", temp_name);
+                } else {
+                    sprintf(display_buffer, "[%lu]    %.32s", temp_type, temp_name);
+                }
+                
+                render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
             }
-            
-            render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
         }
     }
     
@@ -210,28 +217,28 @@ reload_directory:
     while (1) {
         keypad_read();
         if (get_key_state(KEY_POWER) || get_key_state(KEY_BACK)) {
+            free(path_buffer);
+            free(display_buffer);
             return -2;
         }
         if (get_key_state(KEY_ENTER)) {
-            // 選択された項目の情報を取得
-            char selected_name[32];
-            unsigned long selected_type;
-            
             if (get_file_at_index(real_path, selected_index, selected_name, &selected_type) == 0) {
                 // ディレクトリの場合、パスを更新して再読み込み
                 if (selected_type == 0) {
                     // ".." の場合は親ディレクトリに移動
                     if (strcmp(selected_name, "..") == 0) {
-                        char *last_sep = strrchr(real_path, '\\');
-                        if (last_sep != NULL && last_sep > real_path + 6) {
+                        last_sep = strrchr(real_path, '\\');
+                        // ドライブルート(例: "\\drv0\")より深い位置にいる場合のみ親に移動
+                        if (last_sep != NULL && (last_sep - real_path) > 6) {
                             *last_sep = '\0';
                         }
                     } else {
                         // サブディレクトリに移動
-                        size_t len = strlen(real_path);
-                        size_t name_len = strlen(selected_name);
+                        len = strlen(real_path);
+                        name_len = strlen(selected_name);
                         
-                        if (len + name_len + 2 < 48) {
+                        // バッファサイズチェック（null文字含む）
+                        if (len + name_len + 2 <= 48) {
                             if (len > 0 && real_path[len - 1] != '\\') {
                                 strcat(real_path, "\\");
                             }
@@ -250,92 +257,51 @@ reload_directory:
             }
         }
         if (get_key_state(KEY_UP)){
-          if (selected_index > 0) {
-              prev_selected_index = selected_index;
-              selected_index--;
-              
-              // スクロールが必要か確認
-              if (selected_index < scroll_offset) {
-                  scroll_offset = selected_index;
-                  // 画面全体を再描画
-                  set_pen(create_rgb16(0, 0, 0));
-                  draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
-                  
-                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
-                      char temp_name[32];
-                      unsigned long temp_type;
-                      int idx = scroll_offset + i;
-                      
-                      if (get_file_at_index(real_path, idx, temp_name, &temp_type) == 0) {
-                          set_pen(create_rgb16(255, 255, 255));
-                          if (temp_type == 0) {
-                              sprintf(display_buffer, "[DIR]  %s", temp_name);
-                          } else if (temp_type == 1) {
-                              sprintf(display_buffer, "[FILE] %s", temp_name);
-                          } else {
-                              sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
-                          }
-                          render_text(10, 30 + i * (fnt->height + 2), display_buffer);
-                      }
-                  }
-              }
-              
-              refresh_needed = 1;
-              while (get_key_state(KEY_UP))
-              {
-                  keypad_read();
-              }
-          }
+            if (selected_index > 0) {
+                prev_selected_index = selected_index;
+                selected_index--;
+                refresh_needed = 1;
+                
+                // スクロールが必要か確認
+                if (selected_index < scroll_offset) {
+                    scroll_offset = selected_index;
+                    // スクロール後は笛書きを描画しない（refresh_neededで対応）
+                }
+            }
+            // キーを離すまで待機
+            while (get_key_state(KEY_UP))
+            {
+                keypad_read();
+            }
         }
         if (get_key_state(KEY_DOWN)){
-          if (selected_index < total_files - 1) {
-              prev_selected_index = selected_index;
-              selected_index++;
-              
-              // スクロールが必要か確認
-              if (selected_index >= scroll_offset + MAX_DISPLAY) {
-                  scroll_offset = selected_index - MAX_DISPLAY + 1;
-                  // 画面全体を再描画
-                  set_pen(create_rgb16(0, 0, 0));
-                  draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
-                  
-                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
-                      char temp_name[32];
-                      unsigned long temp_type;
-                      int idx = scroll_offset + i;
-                      
-                      if (get_file_at_index(real_path, idx, temp_name, &temp_type) == 0) {
-                          set_pen(create_rgb16(255, 255, 255));
-                          if (temp_type == 0) {
-                              sprintf(display_buffer, "[DIR]  %s", temp_name);
-                          } else if (temp_type == 1) {
-                              sprintf(display_buffer, "[FILE] %s", temp_name);
-                          } else {
-                              sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
-                          }
-                          render_text(10, 30 + i * (fnt->height + 2), display_buffer);
-                      }
-                  }
-              }
-              
-              refresh_needed = 1;
-              while (get_key_state(KEY_DOWN))
-              {
-                  keypad_read();
-              }
-              
-          }
+            if (selected_index < total_files - 1) {
+                prev_selected_index = selected_index;
+                selected_index++;
+                refresh_needed = 1;
+                
+                // スクロールが必要か確認
+                if (selected_index >= scroll_offset + MAX_DISPLAY) {
+                    scroll_offset = selected_index - MAX_DISPLAY + 1;
+                    // スクロール後は笛書きを描画しない（refresh_neededで対応）
+                }
+            }
+            // キーを離すまで待機
+            while (get_key_state(KEY_DOWN))
+            {
+                keypad_read();
+            }
         }
         if (refresh_needed) {
             // 前のカーソルを消去（黒で上書き）
-            int prev_screen_pos = prev_selected_index - scroll_offset;
+            prev_screen_pos = prev_selected_index - scroll_offset;
             if (prev_screen_pos >= 0 && prev_screen_pos < MAX_DISPLAY) {
                 set_pen(create_rgb16(0, 0, 0));
                 render_text(0, 30 + prev_screen_pos * (fnt->height + 2), ">");
             }
             
             // 新しいカーソルを描画
-            int screen_pos = selected_index - scroll_offset;
+            screen_pos = selected_index - scroll_offset;
             if (screen_pos >= 0 && screen_pos < MAX_DISPLAY) {
                 set_pen(create_rgb16(0, 0, 255));  // 青色
                 render_text(0, 30 + screen_pos * (fnt->height + 2), ">");  // 選択インジケータ
