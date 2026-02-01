@@ -36,6 +36,11 @@ static char *drive[2] = {
 };
 
 int main(void) {
+    size_t path_len = strlen(drive[0]) + strlen("*") + 1;
+    char *path = malloc(path_len);
+    if (path == NULL) {
+        return -2;  // メモリ確保失敗
+    }
     struct font *fnt = get_font();
     int y_pos = 30;  // 描画開始Y座標
     char display_name[80];  // 表示用バッファ
@@ -43,13 +48,14 @@ int main(void) {
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    
+    sprintf(path, "%s%s", drive[0], "*");  // "\\\\drv0\\*"
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    render_text(10, 10, "=== File List (drv0) ===");
-    
-    // 検索パスを構築（ルートディレクトリのすべてのファイル）
-    sprintf(search_path, "%s*", drive[0]);
+    sprintf(display_name, "=== File List: %s ===", drive[0]);  
+    render_text(10, 10, display_name);  // ✅ display_nameを表示
+
+    // この行は削除（上で既にpathを作っている）
+    // sprintf(search_path, "%s*", drive[0]);  ← 削除
     
     // すべてのファイルを読み込む
     ret = sys_findfirst(search_path, &handle, filename, &type);
@@ -100,7 +106,7 @@ int main(void) {
     
     // 終了メッセージ
     set_pen(create_rgb16(0, 255, 0));  // 緑色
-    const char *exit_msg = "Press POWER or BACK key to exit.";
+    const char *exit_msg = "Press POWER.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
         SCREEN_HEIGHT - fnt->height - 10,
@@ -119,8 +125,12 @@ int main(void) {
     // 入力待機ループ
     while (1) {
         keypad_read();
-        if (get_key_state(KEY_POWER) || get_key_state(KEY_BACK)) {
+        if (get_key_state(KEY_POWER)) {
+            free(path);
             return -2;
+        }
+        if (get_key_state(KEY_BACK)){
+          return 0;
         }
         if (get_key_state(KEY_UP)){
           if (selected_index > 0) {
