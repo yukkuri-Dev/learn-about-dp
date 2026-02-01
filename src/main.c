@@ -62,7 +62,7 @@ int main(void) {
     sprintf(path, "%s%s", drive[0], "*");  // "\\\\drv0\\*"
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    sprintf(display_name, "=== File List: %s ===", drive[0]);  
+    sprintf(display_name, "=== File List: %s ===", path);  
     render_text(10, 10, display_name);  //display_nameを表示
 
     // この行は削除（上で既にpathを作っている）
