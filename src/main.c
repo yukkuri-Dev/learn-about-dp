@@ -12,24 +12,15 @@
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
-#define MAX_FILES 15    // 読み込む最大ファイル数（メモリ削減のため15に）
 
-// ファイル情報を保存する構造体
-struct file_entry {
-    char name[24];  // 32→24に削減（メモリ削減）
-    unsigned char type;  // unsigned long→unsigned charに変更（4→1バイト）
-};
-
-struct file_entry file_list[MAX_FILES];
+// グローバル配列を削除 - メモリ削減のため
 int total_files = 0;
 int scroll_offset = 0;
 
-char filename[64];
+char filename[32];        // 64→32に削減
 unsigned long type;
-char search_path[48];      // 64→48に削減
-char real_path[48] = "";   // 64→48に削減
-char path_buffer[48];      // 64→48に削減
-char display_buffer[48];   // 64→48に削減
+char search_path[48];
+char real_path[48] = "";
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -39,11 +30,100 @@ static char *drive[2] = {
     "\\\\crd0\\"   // SDカード
 };
 
+// ディレクトリ内のファイル数をカウント
+int count_files(const char *path) {
+    char temp_filename[32];
+    unsigned long temp_type;
+    int temp_handle;
+    int count = 0;
+    char temp_search[48];
+    int is_root = (strcmp(path, drive[0]) == 0 || strcmp(path, drive[1]) == 0);
+    
+    // ルートでない場合は".."を追加
+    if (!is_root) {
+        count = 1;
+    }
+    
+    sprintf(temp_search, "%s*", path);
+    if (sys_findfirst(temp_search, &temp_handle, temp_filename, &temp_type) == 0) {
+        count++;
+        while (sys_findnext(temp_handle, temp_filename, &temp_type) == 0) {
+            count++;
+        }
+        sys_findclose(temp_handle);
+    }
+    return count;
+}
+
+// 指定されたインデックスのファイル情報を取得（0始まり）
+// ルートでない場合、インデックス0は".."を返す
+int get_file_at_index(const char *path, int index, char *out_name, unsigned long *out_type) {
+    char temp_filename[32];
+    unsigned long temp_type;
+    int temp_handle;
+    int current = 0;
+    char temp_search[48];
+    int is_root = (strcmp(path, drive[0]) == 0 || strcmp(path, drive[1]) == 0);
+    
+    // ルートでない場合、インデックス0は".."
+    if (!is_root && index == 0) {
+        strcpy(out_name, "..");
+        *out_type = 0;  // ディレクトリ
+        return 0;
+    }
+    
+    // ルートでない場合はインデックスを1減らす
+    int file_index = is_root ? index : index - 1;
+    
+    sprintf(temp_search, "%s*", path);
+    if (sys_findfirst(temp_search, &temp_handle, temp_filename, &temp_type) != 0) {
+        return -1;  // ファイルが見つからない
+    }
+    
+    if (current == file_index) {
+        strncpy(out_name, temp_filename, 31);
+        out_name[31] = '\0';
+        *out_type = temp_type;
+        sys_findclose(temp_handle);
+        return 0;
+    }
+    current++;
+    
+    while (sys_findnext(temp_handle, temp_filename, &temp_type) == 0) {
+        if (current == file_index) {
+            strncpy(out_name, temp_filename, 31);
+            out_name[31] = '\0';
+            *out_type = temp_type;
+            sys_findclose(temp_handle);
+            return 0;
+        }
+        current++;
+    }
+    
+    sys_findclose(temp_handle);
+    return -1;  // インデックスが範囲外
+}
+
 int main(void) {
     struct font *fnt;
-    int y_pos = 30;  // 描画開始Y座標
+    int y_pos = 30;
+    char *path_buffer = NULL;      // 動的確保
+    char *display_buffer = NULL;   // 動的確保
     
-    // まず画面を初期化してクラッシュポイントを特定
+    // 動的にメモリ確保
+    path_buffer = (char*)malloc(48);
+    display_buffer = (char*)malloc(48);
+    if (!path_buffer || !display_buffer) {
+        // メモリ確保失敗
+        set_pen(create_rgb16(255, 0, 0));
+        draw_rect(0, 0, 50, 50);
+        lcdc_copy_vram();
+        if (path_buffer) free(path_buffer);
+        if (display_buffer) free(display_buffer);
+        while(1) { keypad_read(); if(get_key_state(KEY_POWER)) return -1; }
+    }
+    
+    // まず画面を初期化
     set_pen(create_rgb16(255, 255, 255));
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     lcdc_copy_vram();
@@ -51,10 +131,11 @@ int main(void) {
     // フォントを取得
     fnt = get_font();
     if (fnt == NULL) {
-        // フォント取得失敗の場合は赤い画面を表示
         set_pen(create_rgb16(255, 0, 0));
         draw_rect(0, 0, 100, 100);
         lcdc_copy_vram();
+        free(path_buffer);
+        free(display_buffer);
         while(1) { keypad_read(); if(get_key_state(KEY_POWER)) return -1; }
     }
     
@@ -63,9 +144,8 @@ int main(void) {
         strcpy(real_path, drive[0]);
     }
     
-reload_directory:  // ディレクトリ再読み込みのラベル
-    // グローバル変数をリセット
-    total_files = 0;
+reload_directory:
+    // 変数をリセット
     scroll_offset = 0;
     selected_index = 0;
     prev_selected_index = 0;
@@ -76,86 +156,40 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     // タイトル
-    set_pen(create_rgb16(255, 255, 0));  // 黄色
+    set_pen(create_rgb16(255, 255, 0));
     sprintf(path_buffer, "===%.40s", real_path);
     render_text(10, 10, path_buffer);
     
-    // 検索パスを構築（ルートディレクトリのすべてのファイル）
-    sprintf(search_path, "%s*", real_path);
+    // ファイル数をカウント（キャッシュしない）
+    total_files = count_files(real_path);
     
-    // すべてのファイルを読み込む
-    ret = sys_findfirst(search_path, &handle, filename, &type);
-    
-    if (ret == 0) {
-        // 最初のファイルを保存
-        strncpy(file_list[total_files].name, filename, 23);
-        file_list[total_files].name[23] = '\0';  // NULL終端を保証
-        file_list[total_files].type = (unsigned char)type;
-        total_files++;
+    // 最初のページを描画（必要な分だけファイル情報を取得）
+    for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+        char temp_name[32];
+        unsigned long temp_type;
         
-        // 残りのファイルを順次取得して保存
-        while (total_files < MAX_FILES) {
-            ret = sys_findnext(handle, filename, &type);
-            if (ret != 0) break;
-            
-            strncpy(file_list[total_files].name, filename, 23);
-            file_list[total_files].name[23] = '\0';  // NULL終端を保証
-            file_list[total_files].type = (unsigned char)type;
-            total_files++;
-        }
-        
-        sys_findclose(handle);
-        
-        // 最初のページを描画
-        // ".." エントリを先頭に追加（ルートでない場合）
-        if (strcmp(real_path, drive[0]) != 0 && strcmp(real_path, drive[1]) != 0) {
-          // バッファオーバーフローを防ぐ
-          if (total_files < MAX_FILES) {
-              // 既存のファイルを1つ後ろにシフト
-              for (int i = total_files; i > 0; i--) {
-                strcpy(file_list[i].name, file_list[i-1].name);
-                file_list[i].type = file_list[i-1].type;
-              }
-              // 先頭に ".." を追加
-              strcpy(file_list[0].name, "..");
-              file_list[0].type = 0;  // ディレクトリタイプ
-              total_files++;
-          }
-        }
-        for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+        if (get_file_at_index(real_path, i, temp_name, &temp_type) == 0) {
             set_pen(create_rgb16(255, 255, 255));
             
-            if (file_list[i].type == 0) {
-                // type == 0 はディレクトリ
-                sprintf(display_buffer, "[DIR]  %s", file_list[i].name);
-            } else if (file_list[i].type == 1) {
-                // type == 1 はファイル
-                sprintf(display_buffer, "[FILE] %s", file_list[i].name);
+            if (temp_type == 0) {
+                sprintf(display_buffer, "[DIR]  %s", temp_name);
+            } else if (temp_type == 1) {
+                sprintf(display_buffer, "[FILE] %s", temp_name);
             } else {
-                // それ以外は不明
-                sprintf(display_buffer, "[%lu]    %s",file_list[i].type, file_list[i].name);
+                sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
         }
-        
-        // ファイル数を表示
-        set_pen(create_rgb16(0, 255, 255));  // シアン
-        if (total_files >= MAX_FILES) {
-            sprintf(display_buffer, "%d+ files", total_files);
-        } else {
-            sprintf(display_buffer, "%d files", total_files);
-        }
-        render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_buffer);
-        
-    } else {
-        // ファイルが見つからなかった
-        set_pen(create_rgb16(255, 0, 0));  // 赤色
-        render_text(10, y_pos, "No files found!");
     }
     
+    // ファイル数を表示
+    set_pen(create_rgb16(0, 255, 255));
+    sprintf(display_buffer, "%d files", total_files);
+    render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_buffer);
+    
     // 終了メッセージ
-    set_pen(create_rgb16(0, 255, 0));  // 緑色
+    set_pen(create_rgb16(0, 255, 0));
     char *exit_msg = "Press POWER or BACK key to exit.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
@@ -179,35 +213,37 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             return -2;
         }
         if (get_key_state(KEY_ENTER)) {
-            // 選択された項目を処理
-            if (file_list[selected_index].type == 0) {
+            // 選択された項目の情報を取得
+            char selected_name[32];
+            unsigned long selected_type;
+            
+            if (get_file_at_index(real_path, selected_index, selected_name, &selected_type) == 0) {
                 // ディレクトリの場合、パスを更新して再読み込み
-                if (strcmp(file_list[selected_index].name, "..") == 0) {
-                    // 親ディレクトリに移動
-                    char *last_sep = strrchr(real_path, '\\');
-                    // ルートディレクトリではない場合のみ移動（例: \\drv0\ より長い場合）
-                    if (last_sep != NULL && last_sep > real_path + 6) {
-                        *last_sep = '\0'; // 最後のセパレータ以降を削除
-                    }
-                } else {
-                    // サブディレクトリに移動
-                    size_t len = strlen(real_path);
-                    size_t name_len = strlen(file_list[selected_index].name);
-                    
-                    // バッファオーバーフローを防ぐ (real_pathは48バイト)
-                    if (len + name_len + 2 < 48) {
-                        // パスの最後に\があるか確認
-                        if (len > 0 && real_path[len - 1] != '\\') {
-                            strcat(real_path, "\\");
+                if (selected_type == 0) {
+                    // ".." の場合は親ディレクトリに移動
+                    if (strcmp(selected_name, "..") == 0) {
+                        char *last_sep = strrchr(real_path, '\\');
+                        if (last_sep != NULL && last_sep > real_path + 6) {
+                            *last_sep = '\0';
                         }
-                        strcat(real_path, file_list[selected_index].name);
+                    } else {
+                        // サブディレクトリに移動
+                        size_t len = strlen(real_path);
+                        size_t name_len = strlen(selected_name);
+                        
+                        if (len + name_len + 2 < 48) {
+                            if (len > 0 && real_path[len - 1] != '\\') {
+                                strcat(real_path, "\\");
+                            }
+                            strcat(real_path, selected_name);
+                        }
                     }
+                    
+                    // ディレクトリを再読み込み
+                    goto reload_directory;
                 }
-                
-                // ディレクトリを再読み込み
-                goto reload_directory;
             }
-            // ファイルの場合は何もしない（将来的にファイル操作を追加可能）
+            // キーを離すまで待機
             while (get_key_state(KEY_ENTER))
             {
                 keypad_read();
@@ -226,16 +262,21 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                   draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
                   
                   for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
-                      set_pen(create_rgb16(255, 255, 255));
+                      char temp_name[32];
+                      unsigned long temp_type;
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 0) {
-                          sprintf(display_buffer, "[DIR]  %s", file_list[idx].name);
-                      } else if (file_list[idx].type == 1) {
-                          sprintf(display_buffer, "[FILE] %s", file_list[idx].name);
-                      } else {
-                          sprintf(display_buffer, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
+                      
+                      if (get_file_at_index(real_path, idx, temp_name, &temp_type) == 0) {
+                          set_pen(create_rgb16(255, 255, 255));
+                          if (temp_type == 0) {
+                              sprintf(display_buffer, "[DIR]  %s", temp_name);
+                          } else if (temp_type == 1) {
+                              sprintf(display_buffer, "[FILE] %s", temp_name);
+                          } else {
+                              sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
+                          }
+                          render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                       }
-                      render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
               }
               
@@ -259,16 +300,21 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                   draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
                   
                   for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
-                      set_pen(create_rgb16(255, 255, 255));
+                      char temp_name[32];
+                      unsigned long temp_type;
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 0) {
-                          sprintf(display_buffer, "[DIR]  %s", file_list[idx].name);
-                      } else if (file_list[idx].type == 1) {
-                          sprintf(display_buffer, "[FILE] %s", file_list[idx].name);
-                      } else {
-                          sprintf(display_buffer, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
+                      
+                      if (get_file_at_index(real_path, idx, temp_name, &temp_type) == 0) {
+                          set_pen(create_rgb16(255, 255, 255));
+                          if (temp_type == 0) {
+                              sprintf(display_buffer, "[DIR]  %s", temp_name);
+                          } else if (temp_type == 1) {
+                              sprintf(display_buffer, "[FILE] %s", temp_name);
+                          } else {
+                              sprintf(display_buffer, "[%lu]    %s", temp_type, temp_name);
+                          }
+                          render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                       }
-                      render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
               }
               
@@ -306,4 +352,9 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             refresh_needed = 0;
         }
     }
+    
+    // メモリ解放（実際にはここに到達しないが念のため）
+    free(path_buffer);
+    free(display_buffer);
+    return 0;
 }
