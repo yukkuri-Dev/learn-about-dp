@@ -3,6 +3,7 @@
 #include <graphics/text.h>
 #include <graphics/lcdc.h>
 #include <sh4a/input/keypad.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -127,7 +128,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     // 終了メッセージ
     set_pen(create_rgb16(0, 255, 0));  // 緑色
-    const char *exit_msg = "Press POWER or BACK key to exit.";
+    char *exit_msg = "Press POWER or BACK key to exit.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
         SCREEN_HEIGHT - fnt->height - 10,
