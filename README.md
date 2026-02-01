@@ -20,3 +20,13 @@ This repository uses the template provided by [brain-hackers/exword-template](ht
 GPL-2.0 でライセンスされている [Gnuboy EX](https://github.com/brijohn/gnuboy-ex) プロジェクトをベースに作成しているため、その規定に従い本リポジトリも [GPL-2.0](COPYING) でライセンスします。
 
 本リポジトリは [brain-hackers/exword-template](https://github.com/brain-hackers/exword-template) というテンプレートを利用しています。
+---
+# Doing
+- get file type and folder display properly [x]
+- display file size [ ]
+- navigate into folders [ ]
+- create/delete folders [ ]
+- rename files/folders [ ]
+- copy files/folders [ ]
+- move files/folders [ ] [ ]
+- delete files/folders [ ]

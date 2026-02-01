@@ -76,7 +76,7 @@ int main(void) {
         for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
             set_pen(create_rgb16(255, 255, 255));
             
-            if (file_list[i].type == 0 || file_list[i].type == 5) {
+            if (file_list[i].type == 5) {
                 sprintf(display_name, "[DIR]  %s", file_list[i].name);
             } else if (file_list[i].type == 1) {
                 sprintf(display_name, "[FILE] %s", file_list[i].name);
@@ -137,7 +137,7 @@ int main(void) {
                   for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 0 || file_list[idx].type == 5) {
+                      if (file_list[idx].type == 5) {
                           sprintf(display_name, "[DIR]  %s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
@@ -170,7 +170,7 @@ int main(void) {
                   for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 0 || file_list[idx].type == 5) {
+                      if (file_list[idx].type == 5) {
                           sprintf(display_name, "[DIR]  %s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
