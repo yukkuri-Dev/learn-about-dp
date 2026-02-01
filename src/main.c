@@ -36,6 +36,22 @@ static char *drive[2] = {
     "\\\\crd0\\"   // SDカード
 };
 
+// 選択されたファイル名を取得
+char* get_selected_filename(void) {
+    if (selected_index >= 0 && selected_index < total_files) {
+        return file_list[selected_index].name;
+    }
+    return NULL;
+}
+
+// 選択されたファイルタイプを取得
+unsigned long get_selected_filetype(void) {
+    if (selected_index >= 0 && selected_index < total_files) {
+        return file_list[selected_index].type;
+    }
+    return 0;
+}
+
 int main(void) {
     memmgr_init();
     size_t path_len = strlen(drive[0]) + strlen("*") + 1;
@@ -117,7 +133,7 @@ int main(void) {
     
     // 終了メッセージ
     set_pen(create_rgb16(0, 255, 0));  // 緑色
-    char *exit_msg = "Press POWER.";
+    char *exit_msg = "Press POWER to exit.";
     render_text(
         (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
         SCREEN_HEIGHT - fnt->height - 10,
@@ -142,6 +158,34 @@ int main(void) {
         }
         if (get_key_state(KEY_BACK)){
           return 0;
+        }
+        if (get_key_state(KEY_ENTER)){
+          // 選択されたファイル名を取得
+          char *selected_file = get_selected_filename();
+          unsigned long selected_type = get_selected_filetype();
+          
+          if (selected_file != NULL) {
+              // デバッグ表示：選択されたファイル情報を表示
+              set_pen(create_rgb16(0, 0, 0));
+              draw_rect(10, SCREEN_HEIGHT - 40, SCREEN_WIDTH - 20, 30);
+              set_pen(create_rgb16(255, 255, 0));
+              
+              if (selected_type == 5) {
+                  sprintf(display_name, "Selected: [DIR] %s", selected_file);
+              } else if (selected_type == 1) {
+                  sprintf(display_name, "Selected: [FILE] %s", selected_file);
+              } else {
+                  sprintf(display_name, "Selected: %s", selected_file);
+              }
+              
+              render_text(10, SCREEN_HEIGHT - 35, display_name);
+              lcdc_copy_vram();
+          }
+          
+          while (get_key_state(KEY_ENTER))
+          {
+              keypad_read();
+          }
         }
         if (get_key_state(KEY_UP)){
           if (selected_index > 0) {
