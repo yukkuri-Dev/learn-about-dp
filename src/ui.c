@@ -11,13 +11,17 @@ int scroll_offset = 0;
 int selected_index = 0;
 int prev_selected_index = 0;
 int refresh_needed = 1;
+static char display_name[80];  // 再利用されるバッファ
 
 void ui_init(void) {
     ui_font = get_font();
-    
-    // 背景を黒で塗りつぶす
-    set_pen(create_rgb16(0, 0, 0));
-    draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    if (ui_font == NULL) {
+        // フォント取得失敗
+        set_pen(create_rgb16(255, 0, 0));
+        draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        lcdc_copy_vram();
+        while(1);  // ハング
+    }
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
@@ -40,7 +44,6 @@ void ui_clear_screen(void) {
 
 void ui_draw_file_list(int total_files) {
     int y_pos = 30;
-    char display_name[80];
     
     ui_clear_screen();
     
@@ -68,23 +71,22 @@ void ui_draw_file_list(int total_files) {
 
 void ui_update_cursor(int total_files) {
     int y_pos = 30;
+    int prev_screen_pos = prev_selected_index - scroll_offset;
+    int screen_pos = selected_index - scroll_offset;
     
     // 前のカーソルを消去（黒で上書き）
-    int prev_screen_pos = prev_selected_index - scroll_offset;
     if (prev_screen_pos >= 0 && prev_screen_pos < MAX_DISPLAY) {
         set_pen(create_rgb16(0, 0, 0));
         render_text(0, y_pos + prev_screen_pos * (ui_font->height + 2), ">");
     }
     
     // 新しいカーソルを描画
-    int screen_pos = selected_index - scroll_offset;
     if (screen_pos >= 0 && screen_pos < MAX_DISPLAY) {
         set_pen(create_rgb16(0, 0, 255));  // 青色
         render_text(0, y_pos + screen_pos * (ui_font->height + 2), ">");
     }
     
     // デバッグ情報を表示
-    char display_name[80];
     set_pen(create_rgb16(0, 0, 0));
     draw_rect(400, 10, 120, 20);
     set_pen(create_rgb16(255, 255, 255));

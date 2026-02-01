@@ -15,6 +15,7 @@ int main(void) {
     ui_draw_file_list(total_files);
     ui_update_cursor(total_files);
     ui_update_vram();
+    refresh_needed = 0;  // 初期化
     
     // メインループ
     while (1) {

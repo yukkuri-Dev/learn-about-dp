@@ -11,9 +11,10 @@ static char *drive[2] = {
 };
 
 int load_files(const char *path) {
-    char filename[64];
-    unsigned long type;
-    char search_path[128];
+    // ローカルバッファをグローバルに移動してスタック効率を改善
+    static char filename[64];
+    static unsigned long type;
+    static char search_path[128];
     int ret, handle;
     
     total_files = 0;
