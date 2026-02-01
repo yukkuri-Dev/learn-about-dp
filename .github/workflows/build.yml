@@ -2,16 +2,15 @@ name: Build
 
 on:
   push:
-    tags: '*'
+    tags:
+      - '*'
   workflow_dispatch:
     inputs:
       tag:
         type: string
-        description: 'Tag Name to be created'
-        push:
-          branches:
-            - main
-            - master
+        description: 'Tag name to be created (optional)'
+        required: false
+
 jobs:
   build:
     name: Build EX-word addon
@@ -20,22 +19,39 @@ jobs:
       contents: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="auto-$(uuidgen)"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
 
       - name: Build
         run: |
           cd ..
           curl -sSfL https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz | tar -zxf -
           cd -
-          DEVKITPRO="$OLDPWD/devkitPro" DEVKITSH4="$DEVKITPRO/devkitSH4" PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH" make
+          DEVKITPRO="$OLDPWD/devkitPro" \
+          DEVKITSH4="$DEVKITPRO/devkitSH4" \
+          PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH" \
+          make
           zip -r build.zip build
 
       - name: Publish
         run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            gh release create "${{ inputs.tag }}" -t "${{ inputs.tag }}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
-          else
-            gh release create "${GITHUB_REF/refs\/*s\//}" -t "${GITHUB_REF/refs\/*s\//}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
-          fi
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            -t "${{ steps.tag.outputs.tag }}" \
+            -n "Automatic build of $(git rev-parse HEAD)." \
+            ./build.zip
