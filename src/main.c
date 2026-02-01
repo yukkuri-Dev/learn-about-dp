@@ -27,7 +27,7 @@ int scroll_offset = 0;
 char filename[64];
 unsigned long type;
 char search_path[128];
-char real_path[128];  // グローバル変数に変更
+char real_path[128] = "";  // 空文字列で初期化
 int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
@@ -39,10 +39,14 @@ static char *drive[2] = {
 
 int main(void) {
     char path[128];
-    struct font *fnt = get_font();
+    struct font *fnt;
     int y_pos = 30;  // 描画開始Y座標
     char display_name[80];  // 表示用バッファ
-    strcpy(real_path, drive[0]);  // 初期パスを内蔵ドライブに設定
+    
+    // 初回のみ初期パスを設定
+    if (real_path[0] == '\0') {
+        strcpy(real_path, drive[0]);
+    }
     
 reload_directory:  // ディレクトリ再読み込みのラベル
     // グローバル変数をリセット
@@ -51,6 +55,9 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     selected_index = 0;
     prev_selected_index = 0;
     refresh_needed = 1;
+    
+    // フォントを取得
+    fnt = get_font();
     
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
@@ -157,18 +164,23 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                 if (strcmp(file_list[selected_index].name, "..") == 0) {
                     // 親ディレクトリに移動
                     char *last_sep = strrchr(real_path, '\\');
-                    // ルートディレクトリではない場合のみ移動
-                    if (last_sep != NULL && last_sep > real_path + 5) {
+                    // ルートディレクトリではない場合のみ移動（例: \\drv0\ より長い場合）
+                    if (last_sep != NULL && last_sep > real_path + 6) {
                         *last_sep = '\0'; // 最後のセパレータ以降を削除
                     }
                 } else {
                     // サブディレクトリに移動
-                    // パスの最後に\があるか確認
                     size_t len = strlen(real_path);
-                    if (len > 0 && real_path[len - 1] != '\\') {
-                        strcat(real_path, "\\");
+                    size_t name_len = strlen(file_list[selected_index].name);
+                    
+                    // バッファオーバーフローを防ぐ
+                    if (len + name_len + 2 < sizeof(real_path)) {
+                        // パスの最後に\があるか確認
+                        if (len > 0 && real_path[len - 1] != '\\') {
+                            strcat(real_path, "\\");
+                        }
+                        strcat(real_path, file_list[selected_index].name);
                     }
-                    strcat(real_path, file_list[selected_index].name);
                 }
                 
                 // ディレクトリを再読み込み
