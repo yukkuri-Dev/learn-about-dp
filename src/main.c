@@ -56,7 +56,8 @@ int main(void) {
     
     if (ret == 0) {
         // 最初のファイルを保存
-        strcpy(file_list[total_files].name, filename);
+        strncpy(file_list[total_files].name, filename, 63);
+        file_list[total_files].name[63] = '\0';
         file_list[total_files].type = type;
         total_files++;
         
@@ -65,7 +66,8 @@ int main(void) {
             ret = sys_findnext(handle, filename, &type);
             if (ret != 0) break;
             
-            strcpy(file_list[total_files].name, filename);
+            strncpy(file_list[total_files].name, filename, 63);
+            file_list[total_files].name[63] = '\0';
             file_list[total_files].type = type;
             total_files++;
         }
@@ -81,7 +83,7 @@ int main(void) {
             } else if (file_list[i].type == 1) {
                 sprintf(display_name, "[FILE] %s", file_list[i].name);
             } else {
-                sprintf(display_name, "[%lu]    %s",file_list[i].type ,file_list[i].name);
+                sprintf(display_name, "[%lu]    %s", file_list[i].type, file_list[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_name);
@@ -142,7 +144,8 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[%lu]    %s",file_list[idx].type ,file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
+                          
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
@@ -175,7 +178,7 @@ int main(void) {
                       } else if (file_list[idx].type == 1) {
                           sprintf(display_name, "[FILE] %s", file_list[idx].name);
                       } else {
-                          sprintf(display_name, "[%lu]    %s",file_list[idx].type ,file_list[idx].name);
+                          sprintf(display_name, "[%lu]    %s", file_list[idx].type, file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
