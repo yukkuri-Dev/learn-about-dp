@@ -69,7 +69,7 @@ int main(void) {
     // sprintf(search_path, "%s*", drive[0]);  ← 削除
     
     // すべてのファイルを読み込む
-    ret = sys_findfirst(search_path, &handle, filename, &type);
+    ret = sys_findfirst(path, &handle, filename, &type);
     
     if (ret == 0) {
         // 最初のファイルを保存
