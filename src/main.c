@@ -77,7 +77,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    snprintf(path_buffer, sizeof(path_buffer), "===File Manager - path:%s", real_path);
+    sprintf(path_buffer, "===File Manager - path:%.90s", real_path);
     render_text(10, 10, path_buffer);
     
     // 検索パスを構築（ルートディレクトリのすべてのファイル）
@@ -125,13 +125,13 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             
             if (file_list[i].type == 0) {
                 // type == 0 はディレクトリ
-                snprintf(display_buffer, sizeof(display_buffer), "[DIR]  %.50s", file_list[i].name);
+                sprintf(display_buffer, "[DIR]  %.50s", file_list[i].name);
             } else if (file_list[i].type == 1) {
                 // type == 1 はファイル
-                snprintf(display_buffer, sizeof(display_buffer), "[FILE] %.50s", file_list[i].name);
+                sprintf(display_buffer, "[FILE] %.50s", file_list[i].name);
             } else {
                 // それ以外は不明
-                snprintf(display_buffer, sizeof(display_buffer), "[%lu]    %.50s",file_list[i].type, file_list[i].name);
+                sprintf(display_buffer, "[%lu]    %.50s",file_list[i].type, file_list[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_buffer);
@@ -139,7 +139,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
         
         // ファイル数を表示
         set_pen(create_rgb16(0, 255, 255));  // シアン
-        snprintf(display_buffer, sizeof(display_buffer), "Total: %d files", total_files);
+        sprintf(display_buffer, "Total: %d files", total_files);
         render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_buffer);
         
     } else {
@@ -256,11 +256,11 @@ reload_directory:  // ディレクトリ再読み込みのラベル
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
                       if (file_list[idx].type == 0) {
-                          snprintf(display_buffer, sizeof(display_buffer), "[DIR]  %.50s", file_list[idx].name);
+                          sprintf(display_buffer, "[DIR]  %.50s", file_list[idx].name);
                       } else if (file_list[idx].type == 1) {
-                          snprintf(display_buffer, sizeof(display_buffer), "[FILE] %.50s", file_list[idx].name);
+                          sprintf(display_buffer, "[FILE] %.50s", file_list[idx].name);
                       } else {
-                          snprintf(display_buffer, sizeof(display_buffer), "[%lu]    %.50s", file_list[idx].type, file_list[idx].name);
+                          sprintf(display_buffer, "[%lu]    %.50s", file_list[idx].type, file_list[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_buffer);
                   }
@@ -293,7 +293,7 @@ reload_directory:  // ディレクトリ再読み込みのラベル
             set_pen(create_rgb16(0, 0, 0));
             draw_rect(400, 10, 120, 20);  // 前の情報を消去
             set_pen(create_rgb16(255, 255, 255));
-            snprintf(display_buffer, sizeof(display_buffer), "Sel: %d/%d", selected_index + 1, total_files);
+            sprintf(display_buffer, "Sel: %d/%d", selected_index + 1, total_files);
             render_text(400, 10, display_buffer);
             
             lcdc_copy_vram();
