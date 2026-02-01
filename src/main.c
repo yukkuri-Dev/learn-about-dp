@@ -36,20 +36,23 @@ static char *drive[2] = {
 };
 
 int main(void) {
+    char path[128];
+    char real_path[128];
     struct font *fnt = get_font();
     int y_pos = 30;  // 描画開始Y座標
     char display_name[80];  // 表示用バッファ
-    
+    strcpy(real_path, drive[0]);  // 初期パスを内蔵ドライブに設定
     // 背景を黒で塗りつぶす
     set_pen(create_rgb16(0, 0, 0));
     draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     // タイトル
     set_pen(create_rgb16(255, 255, 0));  // 黄色
-    render_text(10, 10, "=== File List (drv0) ===");
+    sprintf(path, "===File Manager - path:%s", real_path);
+    render_text(10, 10, path);
     
     // 検索パスを構築（ルートディレクトリのすべてのファイル）
-    sprintf(search_path, "%s*", drive[0]);
+    sprintf(search_path, "%s*", real_path);
     
     // すべてのファイルを読み込む
     ret = sys_findfirst(search_path, &handle, filename, &type);
@@ -73,6 +76,18 @@ int main(void) {
         sys_findclose(handle);
         
         // 最初のページを描画
+        // ".." エントリを先頭に追加（ルートでない場合）
+        if (strcmp(real_path, drive[0]) != 0 && strcmp(real_path, drive[1]) != 0) {
+          // 既存のファイルを1つ後ろにシフト
+          for (int i = total_files; i > 0; i--) {
+            strcpy(file_list[i].name, file_list[i-1].name);
+            file_list[i].type = file_list[i-1].type;
+          }
+          // 先頭に ".." を追加
+          strcpy(file_list[0].name, "..");
+          file_list[0].type = 0;  // ディレクトリタイプ
+          total_files++;
+        }
         for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
             set_pen(create_rgb16(255, 255, 255));
             
@@ -121,6 +136,36 @@ int main(void) {
         keypad_read();
         if (get_key_state(KEY_POWER) || get_key_state(KEY_BACK)) {
             return -2;
+        }
+        if (get_key_state(KEY_ENTER)) {
+            // 選択された項目を処理
+            if (file_list[selected_index].type == 0) {
+                // ディレクトリの場合、パスを更新して再読み込み
+                if (strcmp(file_list[selected_index].name, "..") == 0) {
+                    // 親ディレクトリに移動
+                    char *last_sep = strrchr(real_path, '\\');
+                    if (last_sep != NULL && last_sep != real_path + 2) { // ルート直下でない場合
+                        *last_sep = '\0'; // 最後のセパレータ以降を削除
+                    } else {
+                        // ルート直下の場合はドライブルートに戻す
+                        strcpy(real_path, drive[0]);
+                    }
+                } else {
+                    // サブディレクトリに移動
+                    if (strcmp(real_path, drive[0]) != 0 && strcmp(real_path, drive[1]) != 0) {
+                        strcat(real_path, "\\");
+                    }
+                    strcat(real_path, file_list[selected_index].name);
+                }
+                
+                // 再初期化のため、main関数を再呼び出し
+                return main();
+            }
+            // ファイルの場合は何もしない（将来的にファイル操作を追加可能）
+            while (get_key_state(KEY_ENTER))
+            {
+                keypad_read();
+            }
         }
         if (get_key_state(KEY_UP)){
           if (selected_index > 0) {
