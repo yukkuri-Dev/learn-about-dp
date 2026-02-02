@@ -25,6 +25,7 @@
 #define DEBUG_INFO_Y 10
 #define DEBUG_INFO_WIDTH 120
 #define DEBUG_INFO_HEIGHT 20
+#define MAX_PATH_LENGTH 256
 
 // ファイル情報を保存する構造体
 struct file_entry {
@@ -42,8 +43,8 @@ struct app_state {
     int refresh_needed;
 };
 
-// Global state
-struct app_state state = {0};
+// Global application state
+struct app_state app_state = {0};
 
 // Temporary variables for file operations
 char filename[64];
@@ -57,18 +58,24 @@ static char *drive[2] = {
 
 // 選択されたファイル名を取得
 char* get_selected_filename(void) {
-    if (state.selected_index >= 0 && state.selected_index < state.total_files) {
-        return state.file_list[state.selected_index].name;
+    if (app_state.selected_index >= 0 && app_state.selected_index < app_state.total_files) {
+        return app_state.file_list[app_state.selected_index].name;
     }
     return NULL;
 }
 
 // 選択されたファイルタイプを取得
 unsigned long get_selected_filetype(void) {
-    if (state.selected_index >= 0 && state.selected_index < state.total_files) {
-        return state.file_list[state.selected_index].type;
+    if (app_state.selected_index >= 0 && app_state.selected_index < app_state.total_files) {
+        return app_state.file_list[app_state.selected_index].type;
     }
     return 0;
+}
+
+// Safe string copy with null termination
+void safe_string_copy(char *dest, const char *src, size_t dest_size) {
+    strncpy(dest, src, dest_size - 1);
+    dest[dest_size - 1] = '\0';
 }
 
 // Clear screen
@@ -97,9 +104,9 @@ void draw_file_list(int start_index, int count) {
     struct font *fnt = get_font();
     int line_height = fnt->height + LINE_SPACING;
     
-    for (int i = 0; i < count && (start_index + i) < state.total_files; i++) {
+    for (int i = 0; i < count && (start_index + i) < app_state.total_files; i++) {
         int y_pos = FILE_LIST_START_Y + i * line_height;
-        draw_file_entry(y_pos, &state.file_list[start_index + i]);
+        draw_file_entry(y_pos, &app_state.file_list[start_index + i]);
     }
 }
 
@@ -155,7 +162,7 @@ void clear_cursor(int screen_position) {
 
 // Calculate screen position from index
 int calculate_screen_position(int index) {
-    return index - state.scroll_offset;
+    return index - app_state.scroll_offset;
 }
 
 // Draw debug info
@@ -167,13 +174,13 @@ void draw_debug_info(void) {
     draw_rect(DEBUG_INFO_X, DEBUG_INFO_Y, DEBUG_INFO_WIDTH, DEBUG_INFO_HEIGHT);
     
     set_pen(create_rgb16(255, 255, 255));
-    sprintf(display_name, "Sel: %d/%d", state.selected_index + 1, state.total_files);
+    sprintf(display_name, "Sel: %d/%d", app_state.selected_index + 1, app_state.total_files);
     render_text(DEBUG_INFO_X, DEBUG_INFO_Y, display_name);
 }
 
 // Load directory contents
 int load_directory(const char *path) {
-    state.total_files = 0;
+    app_state.total_files = 0;
     
     ret = sys_findfirst(path, &handle, filename, &type);
     if (ret != 0) {
@@ -181,20 +188,18 @@ int load_directory(const char *path) {
     }
     
     // Store first file
-    strncpy(state.file_list[state.total_files].name, filename, 63);
-    state.file_list[state.total_files].name[63] = '\0';
-    state.file_list[state.total_files].type = type;
-    state.total_files++;
+    safe_string_copy(app_state.file_list[app_state.total_files].name, filename, 64);
+    app_state.file_list[app_state.total_files].type = type;
+    app_state.total_files++;
     
     // Load remaining files
-    while (state.total_files < MAX_FILES) {
+    while (app_state.total_files < MAX_FILES) {
         ret = sys_findnext(handle, filename, &type);
         if (ret != 0) break;
         
-        strncpy(state.file_list[state.total_files].name, filename, 63);
-        state.file_list[state.total_files].name[63] = '\0';
-        state.file_list[state.total_files].type = type;
-        state.total_files++;
+        safe_string_copy(app_state.file_list[app_state.total_files].name, filename, 64);
+        app_state.file_list[app_state.total_files].type = type;
+        app_state.total_files++;
     }
     
     sys_findclose(handle);
@@ -215,9 +220,9 @@ void redraw_screen(const char *path) {
     clear_screen();
     draw_header(path);
     
-    if (state.total_files > 0) {
-        draw_file_list(state.scroll_offset, MAX_DISPLAY);
-        draw_file_count(state.total_files);
+    if (app_state.total_files > 0) {
+        draw_file_list(app_state.scroll_offset, MAX_DISPLAY);
+        draw_file_count(app_state.total_files);
     } else {
         set_pen(create_rgb16(255, 0, 0));  // Red
         render_text(TEXT_X, FILE_LIST_START_Y, "No files found in this directory");
@@ -229,8 +234,8 @@ void redraw_screen(const char *path) {
 
 // Update cursor display
 void update_cursor_display(void) {
-    int prev_screen_pos = calculate_screen_position(state.prev_selected_index);
-    int screen_pos = calculate_screen_position(state.selected_index);
+    int prev_screen_pos = calculate_screen_position(app_state.prev_selected_index);
+    int screen_pos = calculate_screen_position(app_state.selected_index);
     
     // Clear previous cursor
     if (prev_screen_pos >= 0 && prev_screen_pos < MAX_DISPLAY) {
@@ -244,13 +249,13 @@ void update_cursor_display(void) {
     
     draw_debug_info();
     lcdc_copy_vram();
-    state.refresh_needed = 0;
+    app_state.refresh_needed = 0;
 }
 
 // Navigate to directory
 void navigate_to_directory(const char *selected_file, char *current_path) {
-    char *new_path = memmgr_alloc(256);
-    char *search_str = memmgr_alloc(256);
+    char *new_path = memmgr_alloc(MAX_PATH_LENGTH);
+    char *search_str = memmgr_alloc(MAX_PATH_LENGTH);
     
     if (new_path == NULL || search_str == NULL) {
         if (new_path) memmgr_free(new_path);
@@ -273,15 +278,15 @@ void navigate_to_directory(const char *selected_file, char *current_path) {
     sprintf(search_str, "%s*", new_path);
     
     // Reset navigation state
-    state.selected_index = 0;
-    state.prev_selected_index = 0;
-    state.scroll_offset = 0;
+    app_state.selected_index = 0;
+    app_state.prev_selected_index = 0;
+    app_state.scroll_offset = 0;
     
     // Load new directory
     if (load_directory(search_str) == 0) {
         strcpy(current_path, search_str);
         redraw_screen(current_path);
-        state.refresh_needed = 1;
+        app_state.refresh_needed = 1;
     }
     
     memmgr_free(new_path);
@@ -290,40 +295,40 @@ void navigate_to_directory(const char *selected_file, char *current_path) {
 
 // Move selection up
 void move_selection_up(void) {
-    if (state.selected_index <= 0) {
+    if (app_state.selected_index <= 0) {
         return;
     }
     
-    state.prev_selected_index = state.selected_index;
-    state.selected_index--;
+    app_state.prev_selected_index = app_state.selected_index;
+    app_state.selected_index--;
     
     // Check if scrolling is needed
-    if (state.selected_index < state.scroll_offset) {
-        state.scroll_offset = state.selected_index;
+    if (app_state.selected_index < app_state.scroll_offset) {
+        app_state.scroll_offset = app_state.selected_index;
         clear_file_list_area();
-        draw_file_list(state.scroll_offset, MAX_DISPLAY);
+        draw_file_list(app_state.scroll_offset, MAX_DISPLAY);
     }
     
-    state.refresh_needed = 1;
+    app_state.refresh_needed = 1;
 }
 
 // Move selection down
 void move_selection_down(void) {
-    if (state.selected_index >= state.total_files - 1) {
+    if (app_state.selected_index >= app_state.total_files - 1) {
         return;
     }
     
-    state.prev_selected_index = state.selected_index;
-    state.selected_index++;
+    app_state.prev_selected_index = app_state.selected_index;
+    app_state.selected_index++;
     
     // Check if scrolling is needed
-    if (state.selected_index >= state.scroll_offset + MAX_DISPLAY) {
-        state.scroll_offset = state.selected_index - MAX_DISPLAY + 1;
+    if (app_state.selected_index >= app_state.scroll_offset + MAX_DISPLAY) {
+        app_state.scroll_offset = app_state.selected_index - MAX_DISPLAY + 1;
         clear_file_list_area();
-        draw_file_list(state.scroll_offset, MAX_DISPLAY);
+        draw_file_list(app_state.scroll_offset, MAX_DISPLAY);
     }
     
-    state.refresh_needed = 1;
+    app_state.refresh_needed = 1;
 }
 
 // Handle ENTER key press
@@ -386,7 +391,7 @@ void handle_input(char *current_path) {
             handle_down_key();
         }
         
-        if (state.refresh_needed) {
+        if (app_state.refresh_needed) {
             update_cursor_display();
         }
     }
@@ -397,11 +402,11 @@ int initialize_app(void) {
     memmgr_init();
     
     // Initialize state
-    state.total_files = 0;
-    state.scroll_offset = 0;
-    state.selected_index = 0;
-    state.prev_selected_index = 0;
-    state.refresh_needed = 1;
+    app_state.total_files = 0;
+    app_state.scroll_offset = 0;
+    app_state.selected_index = 0;
+    app_state.prev_selected_index = 0;
+    app_state.refresh_needed = 1;
     
     return 0;
 }
@@ -411,9 +416,9 @@ void draw_initial_screen(const char *path) {
     clear_screen();
     draw_header(path);
     
-    if (state.total_files > 0) {
+    if (app_state.total_files > 0) {
         draw_file_list(0, MAX_DISPLAY);
-        draw_file_count(state.total_files);
+        draw_file_count(app_state.total_files);
         
         // Draw initial cursor
         draw_cursor(0);
