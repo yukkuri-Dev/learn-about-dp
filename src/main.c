@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syscalls/syscalls.h>
+#include <libct/print.h>
 
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
@@ -73,13 +74,12 @@ int main(void) {
     char display_name[80];  // 表示用バッファ
     
     // 背景を黒で塗りつぶす
-    set_pen(create_rgb16(0, 0, 0));
-    draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    ct_screen_clear(create_rgb16(0, 0, 0));
     sprintf(path, "%s%s", drive[0], "*");  // "\\\\drv0\\*"
     // タイトル
-    set_pen(create_rgb16(255, 255, 0));  // 黄色
-    sprintf(display_name, "=== File List: %s ===", path);  
-    render_text(10, 10, display_name);  //display_nameを表示
+    ct_print(10, 10, "=== File List: ", create_rgb16(255, 255, 0));  // 黄色
+    ct_print(10 + strlen("=== File List: ") * fnt->width, 10, path, create_rgb16(255, 255, 0));
+    ct_print(10 + (strlen("=== File List: ") + strlen(path)) * fnt->width, 10, " ===", create_rgb16(255, 255, 0));
 
     // この行は削除（上で既にpathを作っている）
     // sprintf(search_path, "%s*", drive[0]);  ← 削除
