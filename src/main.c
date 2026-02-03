@@ -9,26 +9,15 @@
 #include <stdio.h>
 #include <syscalls/syscalls.h>
 #include <libct/print.h>
+#include <libct/fsc/fs-control.h>
 
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
 #define MAX_FILES 100   // 読み込む最大ファイル数
 
-// ファイル情報を保存する構造体
-struct file_entry {
-    char name[64];
-    unsigned long type;
-};
-
-struct file_entry file_list[MAX_FILES];
-int total_files = 0;
+struct file_list_result current_files = {0};
 int scroll_offset = 0;
-
-char filename[64];
-unsigned long type;
-char search_path[128];
-int ret, handle;
 int selected_index = 0;
 int prev_selected_index = 0;
 int refresh_needed = 1;
@@ -39,16 +28,16 @@ static char *drive[2] = {
 
 // 選択されたファイル名を取得
 char* get_selected_filename(void) {
-    if (selected_index >= 0 && selected_index < total_files) {
-        return file_list[selected_index].name;
+    if (selected_index >= 0 && selected_index < current_files.count) {
+        return current_files.entries[selected_index].name;
     }
     return NULL;
 }
 
 // 選択されたファイルタイプを取得
 unsigned long get_selected_filetype(void) {
-    if (selected_index >= 0 && selected_index < total_files) {
-        return file_list[selected_index].type;
+    if (selected_index >= 0 && selected_index < current_files.count) {
+        return current_files.entries[selected_index].type;
     }
     return 0;
 }
@@ -60,6 +49,7 @@ int main(void) {
     if (path == NULL) {
       set_pen(create_rgb16(255, 0, 0));  // 赤色
       render_text(10, 10, "Memory allocation failed!");
+      ct_print(10, 30, "Press POWER to exit.", create_rgb16(255, 0, 0));
       lcdc_copy_vram();
       while (1) {
         keypad_read();
@@ -81,69 +71,44 @@ int main(void) {
     ct_print(10 + strlen("=== File List: ") * fnt->width, 10, path, create_rgb16(255, 255, 0));
     ct_print(10 + (strlen("=== File List: ") + strlen(path)) * fnt->width, 10, " ===", create_rgb16(255, 255, 0));
 
-    // この行は削除（上で既にpathを作っている）
-    // sprintf(search_path, "%s*", drive[0]);  ← 削除
     
-    // すべてのファイルを読み込む
-    ret = sys_findfirst(path, &handle, filename, &type);
+    // ファイルリストを取得
+    current_files = get_file_list(path);
     
-    if (ret == 0) {
-        // 最初のファイルを保存
-        strcpy(file_list[total_files].name, filename);
-        file_list[total_files].type = type;
-        total_files++;
-        
-        // 残りのファイルを順次取得して保存
-        while (total_files < MAX_FILES) {
-            ret = sys_findnext(handle, filename, &type);
-            if (ret != 0) break;
-            
-            strcpy(file_list[total_files].name, filename);
-            file_list[total_files].type = type;
-            total_files++;
-        }
-        
-        sys_findclose(handle);
-        
+    if (current_files.success == 0 && current_files.count > 0) {
         // 最初のページを描画
-        for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+        for (int i = 0; i < MAX_DISPLAY && i < current_files.count; i++) {
             set_pen(create_rgb16(255, 255, 255));
             
-            if (file_list[i].type == 5) {
-                sprintf(display_name, "[DIR]  %s", file_list[i].name);
-            } else if (file_list[i].type == 1) {
-                sprintf(display_name, "[FILE] %s", file_list[i].name);
+            if (current_files.entries[i].type == 5) {
+                sprintf(display_name, "[DIR]  %s", current_files.entries[i].name);
+            } else if (current_files.entries[i].type == 1) {
+                sprintf(display_name, "[FILE] %s", current_files.entries[i].name);
             } else {
-                sprintf(display_name, "[?]    %s", file_list[i].name);
+                sprintf(display_name, "[?]    %s", current_files.entries[i].name);
             }
             
             render_text(10, y_pos + i * (fnt->height + 2), display_name);
         }
         
         // ファイル数を表示
-        set_pen(create_rgb16(0, 255, 255));  // シアン
-        sprintf(display_name, "Total: %d files", total_files);
-        render_text(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_name);
+        sprintf(display_name, "Total: %d files", current_files.count);
+        ct_print(10, y_pos + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
         
     } else {
         // ファイルが見つからなかった
-        set_pen(create_rgb16(255, 0, 0));  // 赤色
-        render_text(10, y_pos, "No files found!");
+        ct_print(10, y_pos, "No files found!", create_rgb16(255, 0, 0));
     }
     
     // 終了メッセージ
-    set_pen(create_rgb16(0, 255, 0));  // 緑色
-    char *exit_msg = "Press POWER to exit. Press BACK to root.";
-    render_text(
-        (SCREEN_WIDTH - strlen(exit_msg) * fnt->width) / 2,
-        SCREEN_HEIGHT - fnt->height - 10,
-        exit_msg
-    );
+    ct_print((SCREEN_WIDTH - strlen("Press POWER to exit. Press BACK to root.") * fnt->width) / 2,
+     SCREEN_HEIGHT - fnt->height - 10,
+     "Press POWER to exit. Press BACK to root.",
+     create_rgb16(0, 255, 0));
     
     // 初期カーソルを描画
-    if (total_files > 0) {
-        set_pen(create_rgb16(0, 0, 255));  // 青色
-        render_text(0, 30, ">");  // 最初の項目にカーソル
+    if (current_files.count > 0) {
+        ct_print(0,30,">",create_rgb16(0,0,255));
     }
     
     // VRAMにコピー（画面に反映）
@@ -154,6 +119,7 @@ int main(void) {
         keypad_read();
         if (get_key_state(KEY_POWER)) {
             memmgr_free(path);
+            if (current_files.entries) memmgr_free(current_files.entries);
             return -2;
         }
         if (get_key_state(KEY_BACK)){
@@ -166,53 +132,34 @@ int main(void) {
           
           if (selected_file != NULL && selected_type == 5) {
               // ディレクトリの場合、そのディレクトリに移動
-              char *new_path = memmgr_alloc(256);
-              char *search_str = memmgr_alloc(256);
-              if (new_path != NULL && search_str != NULL) {
+              char *new_search_path = memmgr_alloc(256);
+              if (new_search_path != NULL) {
                   // 現在のpathから"*"を除去してディレクトリパスを取得
-                  strcpy(new_path, path);
-                  char *star_pos = strchr(new_path, '*');
+                  strcpy(new_search_path, path);
+                  char *star_pos = strchr(new_search_path, '*');
                   if (star_pos != NULL) {
                       *star_pos = '\0';
                   }
                   
                   // 選択したディレクトリを追加
-                  strcat(new_path, selected_file);
-                  strcat(new_path, "\\");
+                  strcat(new_search_path, selected_file);
+                  strcat(new_search_path, "\\");
+                  strcat(new_search_path, "*");
                   
-                  // 検索用のパスを作成（"*"付き）
-                  sprintf(search_str, "%s*", new_path);
+                  // 前のファイルリストを解放
+                  if (current_files.entries) {
+                      memmgr_free(current_files.entries);
+                  }
                   
-                  // 新しいディレクトリのファイル一覧を読み込む
-                  total_files = 0;
+                  // 新しいディレクトリのファイル一覧を取得
+                  current_files = get_file_list(new_search_path);
                   selected_index = 0;
                   prev_selected_index = 0;
                   scroll_offset = 0;
                   
-                  ret = sys_findfirst(search_str, &handle, filename, &type);
-                  if (ret == 0) {
-                      // 最初のファイルを保存
-                      strncpy(file_list[total_files].name, filename, 63);
-                      file_list[total_files].name[63] = '\0';
-                      file_list[total_files].type = type;
-                      total_files++;
-                      
-                      // 残りのファイルを読み込む
-                      while (total_files < MAX_FILES) {
-                          ret = sys_findnext(handle, filename, &type);
-                          if (ret != 0) break;
-                          strncpy(file_list[total_files].name, filename, 63);
-                          file_list[total_files].name[63] = '\0';
-                          file_list[total_files].type = type;
-                          total_files++;
-                      }
-                      sys_findclose(handle);
-                  }
-                  
                   // pathを更新
-                  strcpy(path, search_str);
-                  memmgr_free(new_path);
-                  memmgr_free(search_str);
+                  strcpy(path, new_search_path);
+                  memmgr_free(new_search_path);
                   
                   // 画面全体を再描画
                   set_pen(create_rgb16(0, 0, 0));
@@ -223,28 +170,27 @@ int main(void) {
                   sprintf(display_name, "=== File List: %s ===", path);
                   render_text(10, 10, display_name);
                   
-                  if (total_files > 0) {
+                  if (current_files.count > 0) {
                       // ファイル一覧を表示
-                      for (int i = 0; i < MAX_DISPLAY && i < total_files; i++) {
+                      for (int i = 0; i < MAX_DISPLAY && i < current_files.count; i++) {
                           set_pen(create_rgb16(255, 255, 255));
-                          if (file_list[i].type == 5) {
-                              sprintf(display_name, "[DIR]  %s", file_list[i].name);
-                          } else if (file_list[i].type == 1) {
-                              sprintf(display_name, "[FILE] %s", file_list[i].name);
+                          if (current_files.entries[i].type == 5) {
+                              sprintf(display_name, "[DIR]  %s", current_files.entries[i].name);
+                          } else if (current_files.entries[i].type == 1) {
+                              sprintf(display_name, "[FILE] %s", current_files.entries[i].name);
                           } else {
-                              sprintf(display_name, "[?]    %s", file_list[i].name);
+                              sprintf(display_name, "[?]    %s", current_files.entries[i].name);
                           }
                           render_text(10, 30 + i * (fnt->height + 2), display_name);
                       }
                       
                       // ファイル数を表示
-                      set_pen(create_rgb16(0, 255, 255));
-                      sprintf(display_name, "Total: %d files", total_files);
-                      render_text(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name);
+                      ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
+                      sprintf(display_name, "Total: %d files", current_files.count);
+                      ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
                   } else {
                       // ファイルが見つからなかった
-                      set_pen(create_rgb16(255, 0, 0));
-                      render_text(10, 30, "No files found in this directory");
+                      ct_print(10,30,"No files found in this directory",create_rgb16(255,0,0));
                   }
                   
                   lcdc_copy_vram();
@@ -266,18 +212,16 @@ int main(void) {
               if (selected_index < scroll_offset) {
                   scroll_offset = selected_index;
                   // 画面全体を再描画
-                  set_pen(create_rgb16(0, 0, 0));
-                  draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
-                  
-                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
+                  ct_screen_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2), create_rgb16(0, 0, 0));
+                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < current_files.count; i++) {
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 5) {
-                          sprintf(display_name, "[DIR]  %s", file_list[idx].name);
-                      } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
+                      if (current_files.entries[idx].type == 5) {
+                          sprintf(display_name, "[DIR]  %s", current_files.entries[idx].name);
+                      } else if (current_files.entries[idx].type == 1) {
+                          sprintf(display_name, "[FILE] %s", current_files.entries[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[?]    %s", current_files.entries[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
@@ -291,7 +235,7 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_DOWN)){
-          if (selected_index < total_files - 1) {
+          if (selected_index < current_files.count - 1) {
               prev_selected_index = selected_index;
               selected_index++;
               
@@ -299,18 +243,17 @@ int main(void) {
               if (selected_index >= scroll_offset + MAX_DISPLAY) {
                   scroll_offset = selected_index - MAX_DISPLAY + 1;
                   // 画面全体を再描画
-                  set_pen(create_rgb16(0, 0, 0));
-                  draw_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2));
+                  ct_screen_rect(0, 30, SCREEN_WIDTH, MAX_DISPLAY * (fnt->height + 2), create_rgb16(0, 0, 0));
                   
-                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < total_files; i++) {
+                  for (int i = 0; i < MAX_DISPLAY && (scroll_offset + i) < current_files.count; i++) {
                       set_pen(create_rgb16(255, 255, 255));
                       int idx = scroll_offset + i;
-                      if (file_list[idx].type == 5) {
-                          sprintf(display_name, "[DIR]  %s", file_list[idx].name);
-                      } else if (file_list[idx].type == 1) {
-                          sprintf(display_name, "[FILE] %s", file_list[idx].name);
+                      if (current_files.entries[idx].type == 5) {
+                          sprintf(display_name, "[DIR]  %s", current_files.entries[idx].name);
+                      } else if (current_files.entries[idx].type == 1) {
+                          sprintf(display_name, "[FILE] %s", current_files.entries[idx].name);
                       } else {
-                          sprintf(display_name, "[?]    %s", file_list[idx].name);
+                          sprintf(display_name, "[?]    %s", current_files.entries[idx].name);
                       }
                       render_text(10, 30 + i * (fnt->height + 2), display_name);
                   }
@@ -328,7 +271,7 @@ int main(void) {
             // 前のカーソルを消去（黒で上書き）
             int prev_screen_pos = prev_selected_index - scroll_offset;
             if (prev_screen_pos >= 0 && prev_screen_pos < MAX_DISPLAY) {
-                set_pen(create_rgb16(0, 0, 0));
+                ct_screen_rect(0, 30 + prev_screen_pos * (fnt->height + 2), 10, fnt->height + 2, create_rgb16(0, 0, 0));
                 render_text(0, 30 + prev_screen_pos * (fnt->height + 2), ">");
             }
             
@@ -340,10 +283,9 @@ int main(void) {
             }
             
             // デバッグ情報を表示
-            set_pen(create_rgb16(0, 0, 0));
-            draw_rect(400, 10, 120, 20);  // 前の情報を消去
+            ct_screen_rect(400, 10, 120, 20, create_rgb16(0, 0, 0));  // 前の情報を消去
             set_pen(create_rgb16(255, 255, 255));
-            sprintf(display_name, "Sel: %d/%d", selected_index + 1, total_files);
+            sprintf(display_name, "Sel: %d/%d", selected_index + 1, current_files.count);
             render_text(400, 10, display_name);
             
             lcdc_copy_vram();
