@@ -34,6 +34,7 @@ GPL-2.0 でライセンスされている [Gnuboy EX](https://github.com/brijohn
 ---
 # Progress
 - [x] get file type and folder display properly
+- [ ] Code sharing (library creation) 
 - [ ] display file size 
 - [x] navigate into folders 
 - [ ] create/delete folders 
