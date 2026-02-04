@@ -124,7 +124,7 @@ int main(void) {
 
 
 
-    
+
 
 
     // 入力待機ループ
@@ -242,6 +242,51 @@ int main(void) {
                   keypad_read();
               }
               
+          }
+        }
+        if (get_key_state(KEY_LEFT)){
+          // ドライブ切り替え（内蔵ドライブ）
+          strcpy(path, drive[1]);
+          strcat(path, "*");
+          
+          // 前のファイルリストを解放
+          if (current_files.entries) {
+              memmgr_free(current_files.entries);
+          }
+          
+          // 新しいドライブのファイル一覧を取得
+          current_files = get_file_list(path);
+          selected_index = 0;
+          prev_selected_index = 0;
+          scroll_offset = 0;
+          
+          // 画面全体を再描画
+          set_pen(create_rgb16(0, 0, 0));
+          draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+          
+          // ヘッダーを表示
+          set_pen(create_rgb16(255, 255, 0));
+          sprintf(display_name, "=== File List: %s ===", path);
+          render_text(10, 10, display_name);
+          
+          if (current_files.count > 0) {
+              // ファイル一覧を表示
+              display_file_list(0, fnt, display_name);
+              
+              // ファイル数を表示
+              sprintf(display_name, "Total: %d files", current_files.count);
+              ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
+          } else {
+              // ファイルが見つからなかった
+              ct_print(10,30,"No files found!",create_rgb16(255,0,0));
+          }
+          
+          lcdc_copy_vram();
+          refresh_needed = 1;
+          
+          while (get_key_state(KEY_LEFT))
+          {
+              keypad_read();
           }
         }
         if (refresh_needed) {
