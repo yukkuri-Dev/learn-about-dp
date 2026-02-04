@@ -186,7 +186,6 @@ int main(void) {
                       }
                       
                       // ファイル数を表示
-                      ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
                       sprintf(display_name, "Total: %d files", current_files.count);
                       ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
                   } else {
