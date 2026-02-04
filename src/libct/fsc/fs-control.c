@@ -1,3 +1,4 @@
+#include "fs-control.h"
 #include "libc/memmgr.h"
 #include <stddef.h>
 #include <string.h>
@@ -7,27 +8,8 @@
 #define MAX_FILES 100
 
 int ret, handle;
-static char *drive[2] = {
-    "\\\\drv0\\",  // 内蔵ドライブ
-                    //internal drive
-    "\\\\crd0\\"   // SDカード
-                    //SD card
-};
 unsigned long type;
 char filename[64];
-
-// ファイル情報を保存する構造体
-struct file_entry {
-    char name[64];
-    unsigned long type;
-};
-
-// ファイルリスト返却用構造体
-struct file_list_result {
-    struct file_entry *entries;  // ファイルエントリの配列
-    int count;                   // ファイル数
-    int success;                 // 成功フラグ (0: 成功, 負数: エラー)
-};
 
 struct file_list_result get_file_list(char *search_path){
     struct file_list_result result = {0};

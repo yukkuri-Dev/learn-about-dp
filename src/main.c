@@ -45,6 +45,7 @@ unsigned long get_selected_filetype(void) {
 int main(void) {
     memmgr_init();
     size_t path_len = strlen(drive[0]) + strlen("*") + 1;
+    
     char *path = memmgr_alloc(path_len);
     if (path == NULL) {
       set_pen(create_rgb16(255, 0, 0));  // 赤色
