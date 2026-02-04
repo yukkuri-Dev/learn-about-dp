@@ -1,5 +1,6 @@
 #include <libdataplus/graphics/color.h>
 #include <libdataplus/graphics/text.h>
+#include <libdataplus/graphics/drawing.h>
 
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
