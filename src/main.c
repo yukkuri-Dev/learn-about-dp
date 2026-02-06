@@ -244,7 +244,7 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_LEFT)){
-          // ドライブ切り替え（内蔵ドライブ）
+          // ドライブ切り替え（SDカード）
           /* Ensure 'path' buffer is large enough for drive[1] and '*' */
           {
               size_t needed = strlen(drive[1]) + strlen("*") + 1; /* drive + '*' + '\0' */
