@@ -26,5 +26,5 @@ struct file_list_result {
  * @note 戻り値の構造体に含まれるentries配列の解放は呼び出し側が行う。
  */
 struct file_list_result get_file_list(char *search_path);
-
+int file_create(char *path,char *file_name);
 #endif

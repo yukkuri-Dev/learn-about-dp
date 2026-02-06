@@ -1,5 +1,7 @@
 .vscode/
 build/
+devkitPro/
+devkitPro.tar.gz
 *.o
 *.d01
 *.elf

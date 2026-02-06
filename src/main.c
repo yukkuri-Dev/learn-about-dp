@@ -10,7 +10,8 @@
 #include <syscalls/syscalls.h>
 #include <libct/print.h>
 #include <libct/fsc/fs-control.h>
-
+#include <libct/input.h>
+#include <libct/ui/dialog/user_input_dialog.h>
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
@@ -242,6 +243,77 @@ int main(void) {
               }
               
           }
+        }
+        if (get_key_state(KEY_RIGHT)){
+            char *file_name = user_input_dialog();
+            if (file_name == NULL) {
+                ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation cancelled.", create_rgb16(255,0,0));
+                while (get_key_state(KEY_RIGHT))
+                {
+                    keypad_read();
+                }
+                return 0;
+            }
+            if (file_name[0] == '\0') {
+                ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File name cannot be empty!", create_rgb16(255,0,0));
+                while (get_key_state(KEY_RIGHT))
+                {
+                    keypad_read();
+                }
+                return 0;
+            }
+            int rc = file_create(path, file_name);
+            if (rc < 0){
+              ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
+            } else {
+                refresh_needed = 1;
+                lcdc_copy_vram();
+            }
+            while (get_key_state(KEY_RIGHT))
+            {
+                keypad_read();
+            }
+            /* Mirror KEY_POWER cleanup before exiting */
+            if (current_files.entries) {
+                memmgr_free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path) {
+                free(path);
+                path = NULL;
+            }
+            if (current_files.entries != NULL) {
+                free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path != NULL) {
+                free(path);
+                path = NULL;
+            }
+            return 0;
+        }
+        if (get_key_state(KEY_BACKSPACE)){
+            yes_or_no_dialog("Delete file?", create_rgb16(255, 0, 0));
+            refresh_needed = 1;
+            lcdc_copy_vram();
+            if (current_files.entries != NULL) {
+                free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path != NULL) {
+                free(path);
+                path = NULL;
+            }
+            /* Mirror KEY_POWER cleanup before exiting */
+            if (current_files.entries) {
+                memmgr_free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path) {
+                free(path);
+                path = NULL;
+            }
+            return 0;
         }
         if (get_key_state(KEY_LEFT)){
           // ドライブ切り替え（SDカード）
