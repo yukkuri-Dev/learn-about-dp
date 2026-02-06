@@ -265,12 +265,28 @@ int main(void) {
                 free(path);
                 path = NULL;
             }
+            if (current_files.entries != NULL) {
+                free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path != NULL) {
+                free(path);
+                path = NULL;
+            }
             return 0;
         }
         if (get_key_state(KEY_BACKSPACE)){
             yes_or_no_dialog("Delete file?", create_rgb16(255, 0, 0));
             refresh_needed = 1;
             lcdc_copy_vram();
+            if (current_files.entries != NULL) {
+                free(current_files.entries);
+                current_files.entries = NULL;
+            }
+            if (path != NULL) {
+                free(path);
+                path = NULL;
+            }
             /* Mirror KEY_POWER cleanup before exiting */
             if (current_files.entries) {
                 memmgr_free(current_files.entries);
