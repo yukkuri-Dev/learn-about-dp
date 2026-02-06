@@ -244,10 +244,12 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_RIGHT)){
-            int rc = file_create(drive[1],"newfile.txt");
+            int rc = file_create(drive[0],"newfile.txt");
             if (rc < 0){
               ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
             }
+            refresh_needed = 1;
+            lcdc_copy_vram();
             while (get_key_state(KEY_RIGHT))
             {
                 keypad_read();
