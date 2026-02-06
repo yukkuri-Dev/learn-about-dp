@@ -245,8 +245,7 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_RIGHT)){
-            user_input_dialog();
-            int rc = file_create(drive[0],"newfile.txt");
+            int rc = file_create(path, user_input_dialog());
             if (rc < 0){
               ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
             } else {
@@ -257,6 +256,13 @@ int main(void) {
             {
                 keypad_read();
             }
+            return 0;
+        }
+        if (get_key_state(KEY_BACKSPACE)){
+            yes_or_no_dialog("Delete file?", create_rgb16(255, 0, 0));
+            refresh_needed = 1;
+            lcdc_copy_vram();
+            return 0;
         }
         if (get_key_state(KEY_LEFT)){
           // ドライブ切り替え（SDカード）

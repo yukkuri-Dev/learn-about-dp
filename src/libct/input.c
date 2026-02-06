@@ -21,6 +21,7 @@ int ct_get_current_keycode(void){
     return -1;
 }
 char keycode_to_text(int keycode){
+
     switch(keycode){
         case KEY_CHAR_A: return 'A';
         case KEY_CHAR_B: return 'B';
@@ -48,6 +49,6 @@ char keycode_to_text(int keycode){
         case KEY_CHAR_X: return 'X';
         case KEY_CHAR_Y: return 'Y';
         case KEY_CHAR_Z: return 'Z';
-        default: return '[IDK]'; // Unknown
+            default: return 0; /* Unknown / unmapped key / is not a character */
     }
-}
+} 
