@@ -7,8 +7,8 @@ include $(DEVKITSH4)/exword_rules
 
 TARGET       := filem
 MODNAME      := filemgr
-APPTITLE     := File Manager
-APPID        := FILEM
+APPTITLE     := File Manager Beta
+APPID        := FILEB
 APPMOD       := $(TARGET).d01
 
 SOURCEDIR    := src
@@ -21,7 +21,7 @@ SFILES       := $(wildcard $(SOURCEDIR)/*.s) $(wildcard $(SOURCEDIR)/libc/*.s)
 OBJECTS      := $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 CC_OPTS      :=
-LDFLAGS      := -Wall -std=gnu17 -nostdlib -L$(DEVKITPRO)/libdataplus/lib -ldataplus -lgraphics -lsh4a
+LDFLAGS      := -Wall -std=gnu17 -nostdlib -L$(DEVKITPRO)/libdataplus/lib -ldataplus -lgraphics -lsh4a -lgcc
 CFLAGS       := -Wall -std=gnu17 -fno-builtin -I$(DEVKITPRO)/libdataplus/include -I$(SOURCEDIR) -I$(SOURCEDIR)/libc/include -O3 $(CC_OPTS)
 ASFLAGS      := -Wall -std=gnu17 -m4-nofpu
 
