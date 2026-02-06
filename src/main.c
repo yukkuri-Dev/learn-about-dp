@@ -10,7 +10,8 @@
 #include <syscalls/syscalls.h>
 #include <libct/print.h>
 #include <libct/fsc/fs-control.h>
-
+#include <libct/input.h>
+#include <libct/ui/dialog/user_input_dialog.h>
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
@@ -244,41 +245,13 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_RIGHT)){
-            /* デバッグ表示：作成対象パス */
-            sprintf(display_name, "Create: %s%s", drive[0], "newfile.txt");
-            ct_print(10, SCREEN_HEIGHT - fnt->height - 60, display_name, create_rgb16(255,255,0));
-            lcdc_copy_vram();
-
+            user_input_dialog();
             int rc = file_create(drive[0],"newfile.txt");
-
-            /* デバッグ表示：結果コード */
-            sprintf(display_name, "create rc: %d", rc);
-            ct_print(10, SCREEN_HEIGHT - fnt->height - 40, display_name, create_rgb16(255,255,0));
-            lcdc_copy_vram();
-
             if (rc < 0){
               ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
             } else {
-              /* 作成成功：現在の検索パスで一覧を再取得して画面を再描画 */
-              if (current_files.entries) memmgr_free(current_files.entries);
-              current_files = get_file_list(path);
-              selected_index = 0;
-              prev_selected_index = 0;
-              scroll_offset = 0;
-
-              set_pen(create_rgb16(255, 255, 0));
-              sprintf(display_name, "=== File List: %s ===", path);
-              render_text(10, 10, display_name);
-
-              if (current_files.count > 0) {
-                  display_file_list(0, fnt, display_name);
-                  sprintf(display_name, "Total: %d files", current_files.count);
-                  ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
-              } else {
-                  ct_print(10, 30, "No files found!", create_rgb16(255, 0, 0));
-              }
-
-              lcdc_copy_vram();
+                refresh_needed = 1;
+                lcdc_copy_vram();
             }
             while (get_key_state(KEY_RIGHT))
             {
