@@ -245,7 +245,24 @@ int main(void) {
           }
         }
         if (get_key_state(KEY_RIGHT)){
-            int rc = file_create(path, user_input_dialog());
+            char *file_name = user_input_dialog();
+            if (file_name == NULL) {
+                ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation cancelled.", create_rgb16(255,0,0));
+                while (get_key_state(KEY_RIGHT))
+                {
+                    keypad_read();
+                }
+                return 0;
+            }
+            if (file_name[0] == '\0') {
+                ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File name cannot be empty!", create_rgb16(255,0,0));
+                while (get_key_state(KEY_RIGHT))
+                {
+                    keypad_read();
+                }
+                return 0;
+            }
+            int rc = file_create(path, file_name);
             if (rc < 0){
               ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
             } else {
