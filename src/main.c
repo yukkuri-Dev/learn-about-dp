@@ -243,6 +243,16 @@ int main(void) {
               
           }
         }
+        if (get_key_state(KEY_RIGHT)){
+            int rc = file_create(drive[1],"newfile.txt");
+            if (rc < 0){
+              ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
+            }
+            while (get_key_state(KEY_RIGHT))
+            {
+                keypad_read();
+            }
+        }
         if (get_key_state(KEY_LEFT)){
           // ドライブ切り替え（SDカード）
           /* Ensure 'path' buffer is large enough for drive[1] and '*' */
