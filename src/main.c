@@ -189,7 +189,6 @@ int main(void) {
                       
                       // ファイル数を表示
                       sprintf(display_name, "Total: %d files", current_files.count);
-                      ct_print(10, 30 + MAX_DISPLAY * (fnt->height + 2) + 10, display_name, create_rgb16(0, 255, 255));
                   } else {
                       // ファイルが見つからなかった
                       ct_print(10,30,"No files found in this directory",create_rgb16(255,0,0));
