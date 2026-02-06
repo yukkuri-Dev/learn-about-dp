@@ -246,6 +246,20 @@ int main(void) {
         }
         if (get_key_state(KEY_LEFT)){
           // ドライブ切り替え（内蔵ドライブ）
+          /* Ensure 'path' buffer is large enough for drive[1] and '*' */
+          {
+              size_t needed = strlen(drive[1]) + strlen("*") + 1; /* drive + '*' + '\0' */
+              char *new_path = realloc(path, needed);
+              if (!new_path) {
+                  /* Allocation failed; abort drive switch to avoid overflow */
+                  while (get_key_state(KEY_LEFT))
+                  {
+                      keypad_read();
+                  }
+                  continue;
+              }
+              path = new_path;
+          }
           strcpy(path, drive[1]);
           strcat(path, "*");
           
