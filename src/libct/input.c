@@ -1,5 +1,4 @@
 #include "input.h"
-#include <sh4a/input/keypad.h>
 #include <libdataplus/sh4a/input/keypad.h>
 #include <libdataplus/sh4a/input/exword_keys.h>
 
