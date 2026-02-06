@@ -81,16 +81,25 @@ struct file_list_result get_file_list(char *search_path){
 
 int file_create(char *path,char *file_name){
     char fullpath[128];
-    size_t path_len = path ? strlen(path) : 0;
+    char path_clean[128];
+
+    /* NULL 安全と '*' の除去 */
+    if (!path) path = "";
+    strncpy(path_clean, path, sizeof(path_clean) - 1);
+    path_clean[sizeof(path_clean) - 1] = '\0';
+    char *star = strchr(path_clean, '*');
+    if (star) *star = '\0';
+
+    size_t path_len = strlen(path_clean);
     size_t name_len = file_name ? strlen(file_name) : 0;
-    int need_sep = (path_len == 0 || path[path_len-1] == '\\' || path[path_len-1] == '/') ? 0 : 1;
+    int need_sep = (path_len == 0 || path_clean[path_len-1] == '\\' || path_clean[path_len-1] == '/') ? 0 : 1;
     if (path_len + need_sep + name_len + 1 > sizeof(fullpath)) {
         return -3;
     }
     if (need_sep)
-        sprintf(fullpath, sizeof(fullpath), "%s\\%s", path, file_name);
+        sprintf(fullpath, "%s\\%s", path_clean, file_name);
     else
-        sprintf(fullpath, sizeof(fullpath), "%s%s", path ? path : "", file_name ? file_name : "");
+        sprintf(fullpath, "%s%s", path_clean, file_name ? file_name : "");
     /* 正しいパスでファイルを作成 */
     int ret = sys_create(fullpath, 1); /* 1 = file */
     return ret; 
