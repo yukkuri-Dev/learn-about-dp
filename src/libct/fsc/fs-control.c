@@ -88,9 +88,9 @@ int file_create(char *path,char *file_name){
         return -3;
     }
     if (need_sep)
-        snprintf(fullpath, sizeof(fullpath), "%s\\%s", path, file_name);
+        sprintf(fullpath, sizeof(fullpath), "%s\\%s", path, file_name);
     else
-        snprintf(fullpath, sizeof(fullpath), "%s%s", path ? path : "", file_name ? file_name : "");
+        sprintf(fullpath, sizeof(fullpath), "%s%s", path ? path : "", file_name ? file_name : "");
     /* 正しいパスでファイルを作成 */
     int ret = sys_create(fullpath, 1); /* 1 = file */
     return ret; 
