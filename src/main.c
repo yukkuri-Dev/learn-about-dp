@@ -353,8 +353,12 @@ int main(void) {
                 lcdc_copy_vram();
                 return 0;
             }
-            sys_delete(selected_full);
-            popup_dialog("File deleted.", create_rgb16(0, 255, 0));
+            int delete_result = sys_delete(selected_full);
+            if (delete_result == 0) {
+                popup_dialog("File deleted.", create_rgb16(0, 255, 0));
+            } else {
+                popup_dialog("Failed to delete file.", create_rgb16(255, 0, 0));
+            }
             memmgr_free(selected_full);
             refresh_needed = 1;
             lcdc_copy_vram();
