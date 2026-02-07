@@ -13,7 +13,6 @@
 #define HW_KATA_COUNT (HW_KATA_LAST - HW_KATA_FIRST + 1)
 
 extern const uint8_t japanese8x8[];
-extern const uint8_t jpn_widths[];
 extern struct font jpn_system;
 
 /* Get pointer to the built-in Japanese font (half-width katakana table). */
