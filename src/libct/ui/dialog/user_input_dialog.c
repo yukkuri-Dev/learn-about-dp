@@ -6,10 +6,24 @@
 #include <graphics/lcdc.h>
 #include <sh4a/input/keypad.h>
 #include <string.h>
-
+#include <stdio.h>
+#include <libct/fonts/jpn-font.h>
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 
+static const char *key_name(int kc) {
+    switch (kc) {
+        case KEY_UP: return "UP";
+        case KEY_DOWN: return "DOWN";
+        case KEY_LEFT: return "LEFT";
+        case KEY_RIGHT: return "RIGHT";
+        case KEY_ENTER: return "ENTER";
+        case KEY_BACK: return "BACK";
+        case KEY_POWER: return "POWER";
+        case KEY_BACKSPACE: return "BACKSPACE";
+        default: return "KEY";
+    }
+}
 
 char *user_input_dialog(void){
     ct_screen_clear(create_rgb16(0,0,0));
@@ -109,6 +123,127 @@ int yes_or_no_dialog(const char *message,uint16_t color){
         if (get_key_state(KEY_BACK)) {
             while(get_key_state(KEY_BACK)) { keypad_read(); }
             return 1; //No
+        }
+    }
+}
+void popup_dialog(const char *message,uint16_t color){
+        ct_screen_clear(create_rgb16(0,0,0));
+        struct font *fnt = get_font();
+        ct_print(10,SCREEN_HEIGHT / 2,message,color);
+        ct_print((SCREEN_WIDTH - strlen("Press ENTER to Continue.") * fnt->width) / 2,
+            SCREEN_HEIGHT - fnt->height - 10,
+            "Press ENTER to Continue.",
+            create_rgb16(0, 255, 0));
+        lcdc_copy_vram();
+
+        while (1) {
+            keypad_read();
+            if (get_key_state(KEY_ENTER)) {
+                while(get_key_state(KEY_ENTER)) { keypad_read(); }
+                return;
+            }
+    }
+}
+
+
+
+
+
+int konami_command_warn_dialog(void){
+    ct_screen_clear(create_rgb16(0, 0, 0));
+    struct font *fnt = get_font();
+
+    ct_print(SCREEN_WIDTH / 2 - (strlen("WAIT! STOP! WARNING!") * fnt->width) / 2,
+             SCREEN_HEIGHT / 2 - fnt->height,
+             "WAIT! STOP! WARNING!",
+             create_rgb16(255, 0, 0));
+
+    ct_print(SCREEN_WIDTH / 2 - (strlen("You're attempting an operation that may cause irreversible changes.") * fnt->width) / 2,
+             SCREEN_HEIGHT / 2,
+             "You're attempting an operation that may cause irreversible changes.",
+             create_rgb16(255, 0, 0));
+
+    ct_print(SCREEN_WIDTH / 2 - (strlen("Proceed only if you understand the risks involved.") * fnt->width) / 2,
+             SCREEN_HEIGHT / 2 + fnt->height,
+             "Proceed only if you understand the risks involved.",
+             create_rgb16(255, 0, 0));
+
+    render_text_utf8_jpn(0,0,"ァィゥ");
+    lcdc_copy_vram();
+
+    /* Require the sequence: UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, ENTER */
+    static const int seq[] = {KEY_UP, KEY_UP, KEY_DOWN, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_LEFT, KEY_RIGHT, KEY_ENTER};
+    int pos = 0;
+    const int seq_len = sizeof(seq) / sizeof(seq[0]);
+
+    while (1) {
+        keypad_read();
+        int kc = ct_get_current_keycode();
+        if (kc == -1) continue;
+
+        /* BACK immediately cancels and returns 1 */
+        if (kc == KEY_BACK) {
+            /* wait for release */
+            while (get_key_state(KEY_BACK)) { keypad_read(); }
+            return 1;
+        }
+
+        if (kc == seq[pos]) {
+            pos++;
+            if (pos == seq_len) {
+                /* matched full sequence */
+                /* wait for final key release */
+                while (get_key_state(seq[seq_len - 1])) { keypad_read(); }
+                return 0;
+            }
+        } else {
+            /* If the key equals the first element, start at 1, else reset */
+            if (kc == seq[0]) pos = 1; else pos = 0;
+        }
+
+        /* Display current progress */
+        uint16_t color = create_rgb16(128, 128, 128); /* Gray default */
+        if (pos > 0) {
+            /* Gradient from gray to yellow based on progress */
+            int intensity = (pos * 255) / seq_len;
+            color = create_rgb16(255, 255, (255 - intensity) / 2);
+        }
+        
+        /* Build and display full sequence, highlighting current position */
+        char progress_text[128];
+        int len = 0;
+        for (int i = 0; i < seq_len && len < (int)sizeof(progress_text) - 1; ++i) {
+            const char *name = key_name(seq[i]);
+            if (i > 0 && len < (int)sizeof(progress_text) - 1) {
+                progress_text[len++] = ' ';
+            }
+            /* Use fixed-size temporary buffer + sprintf, then copy safely to avoid overflow */
+            char tmp[16];
+            if (i < pos) {
+                sprintf(tmp, "%s", name);
+            } else if (i == pos) {
+                sprintf(tmp, "[%s]", name);
+            } else {
+                sprintf(tmp, "%s", name);
+            }
+            int tn = strlen(tmp);
+            int can_copy = (int)sizeof(progress_text) - len - 1;
+            if (tn > can_copy) tn = can_copy;
+            if (tn > 0) {
+                memcpy(progress_text + len, tmp, tn);
+                len += tn;
+            } else {
+                break; /* no more room */
+            }
+        }
+        progress_text[len] = '\0';
+        ct_screen_rect(10, SCREEN_HEIGHT - fnt->height - 30, SCREEN_WIDTH - 20, fnt->height, create_rgb16(0, 0, 0));
+        ct_print(10, SCREEN_HEIGHT - fnt->height - 30, progress_text, color);
+        lcdc_copy_vram();
+
+        /* wait until this key is released to avoid duplicate reads */
+        if (kc >= 0) {
+            while (get_key_state(kc)) { keypad_read(); }
         }
     }
 }

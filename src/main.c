@@ -35,6 +35,30 @@ char* get_selected_filename(void) {
     return NULL;
 }
 
+// 選択されたファイルのフルパスを作成して返す（呼び出し側で解放すること）
+char* get_selected_fullpath(const char *cwd) {
+    if (selected_index >= 0 && selected_index < current_files.count) {
+        const char *name = current_files.entries[selected_index].name;
+        size_t cwdlen = strlen(cwd);
+        size_t namelen = strlen(name);
+        /* allocate enough for cwd (without '*'), optional backslash, name, trailing '\\', '*' and null */
+        char *buf = memmgr_alloc(cwdlen + namelen + 4);
+        if (!buf) return NULL;
+        strcpy(buf, cwd);
+        char *star = strchr(buf, '*');
+        if (star) *star = '\0';
+        /* ensure path ends with backslash */
+        size_t l = strlen(buf);
+        if (l == 0 || buf[l-1] != '\\') {
+            buf[l] = '\\';
+            buf[l+1] = '\0';
+        }
+        strcat(buf, name);
+        return buf;
+    }
+    return NULL;
+}
+
 // 選択されたファイルタイプを取得
 unsigned long get_selected_filetype(void) {
     if (selected_index >= 0 && selected_index < current_files.count) {
@@ -146,57 +170,55 @@ int main(void) {
           
           if (selected_file != NULL && selected_type == 5) {
               // ディレクトリの場合、そのディレクトリに移動
-              char *new_search_path = memmgr_alloc(256);
-              if (new_search_path != NULL) {
-                  // 現在のpathから"*"を除去してディレクトリパスを取得
-                  strcpy(new_search_path, path);
-                  char *star_pos = strchr(new_search_path, '*');
-                  if (star_pos != NULL) {
-                      *star_pos = '\0';
+              char *selected_full = get_selected_fullpath(path);
+              if (selected_full != NULL) {
+                  /* new_search_path = selected_full + "\\*" */
+                  size_t need = strlen(selected_full) + 3;
+                  char *new_search_path = memmgr_alloc(need);
+                  if (new_search_path != NULL) {
+                      strcpy(new_search_path, selected_full);
+                      strcat(new_search_path, "\\");
+                      strcat(new_search_path, "*");
+
+                      // 前のファイルリストを解放
+                      if (current_files.entries) {
+                          memmgr_free(current_files.entries);
+                      }
+
+                      // 新しいディレクトリのファイル一覧を取得
+                      current_files = get_file_list(new_search_path);
+                      selected_index = 0;
+                      prev_selected_index = 0;
+                      scroll_offset = 0;
+
+                      // pathを更新
+                      strcpy(path, new_search_path);
+                      memmgr_free(new_search_path);
+
+                      // 画面全体を再描画
+                      set_pen(create_rgb16(0, 0, 0));
+                      draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+                      // ヘッダーを表示
+                      set_pen(create_rgb16(255, 255, 0));
+                      sprintf(display_name, "=== File List: %s ===", path);
+                      render_text(10, 10, display_name);
+
+                      if (current_files.count > 0) {
+                          // ファイル一覧を表示
+                          display_file_list(0, fnt, display_name);
+
+                          // ファイル数を表示
+                          sprintf(display_name, "Total: %d files", current_files.count);
+                      } else {
+                          // ファイルが見つからなかった
+                          ct_print(10,30,"No files found in this directory",create_rgb16(255,0,0));
+                      }
+
+                      lcdc_copy_vram();
+                      refresh_needed = 1;
                   }
-                  
-                  // 選択したディレクトリを追加
-                  strcat(new_search_path, selected_file);
-                  strcat(new_search_path, "\\");
-                  strcat(new_search_path, "*");
-                  
-                  // 前のファイルリストを解放
-                  if (current_files.entries) {
-                      memmgr_free(current_files.entries);
-                  }
-                  
-                  // 新しいディレクトリのファイル一覧を取得
-                  current_files = get_file_list(new_search_path);
-                  selected_index = 0;
-                  prev_selected_index = 0;
-                  scroll_offset = 0;
-                  
-                  // pathを更新
-                  strcpy(path, new_search_path);
-                  memmgr_free(new_search_path);
-                  
-                  // 画面全体を再描画
-                  set_pen(create_rgb16(0, 0, 0));
-                  draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-                  
-                  // ヘッダーを表示
-                  set_pen(create_rgb16(255, 255, 0));
-                  sprintf(display_name, "=== File List: %s ===", path);
-                  render_text(10, 10, display_name);
-                  
-                  if (current_files.count > 0) {
-                      // ファイル一覧を表示
-                      display_file_list(0, fnt, display_name);
-                      
-                      // ファイル数を表示
-                      sprintf(display_name, "Total: %d files", current_files.count);
-                  } else {
-                      // ファイルが見つからなかった
-                      ct_print(10,30,"No files found in this directory",create_rgb16(255,0,0));
-                  }
-                  
-                  lcdc_copy_vram();
-                  refresh_needed = 1;
+                  memmgr_free(selected_full);
               }
           }
           
@@ -293,7 +315,37 @@ int main(void) {
             return 0;
         }
         if (get_key_state(KEY_BACKSPACE)){
-            yes_or_no_dialog("Delete file?", create_rgb16(255, 0, 0));
+            // 選択されたファイルを削除
+            char *selected_full = get_selected_fullpath(path);
+            if (selected_full == NULL) {
+                popup_dialog("No file selected!", create_rgb16(255, 0, 0));
+                refresh_needed = 1;
+                lcdc_copy_vram();
+                return 0;
+            }
+
+            /* show konami warning (dialog returns 0 on correct sequence, 1 on BACK) */
+            if (konami_command_warn_dialog() == 1) {
+                // ユーザーがキャンセル
+                memmgr_free(selected_full);
+                refresh_needed = 1;
+                lcdc_copy_vram();
+                return 0;
+            }
+
+            // 確認ダイアログを表示（フルパスを見せる）
+            popup_dialog(selected_full, create_rgb16(255, 255, 0));
+            int yn = yes_or_no_dialog("Delete file?", create_rgb16(255, 0, 0));
+            if (yn == 1) {
+                // ユーザーがNoを選択
+                memmgr_free(selected_full);
+                refresh_needed = 1;
+                lcdc_copy_vram();
+                return 0;
+            }
+            sys_delete(selected_full);
+            popup_dialog("File deleted.", create_rgb16(0, 255, 0));
+            memmgr_free(selected_full);
             refresh_needed = 1;
             lcdc_copy_vram();
             if (current_files.entries != NULL) {
