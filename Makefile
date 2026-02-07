@@ -7,8 +7,8 @@ include $(DEVKITSH4)/exword_rules
 
 TARGET       := filem
 MODNAME      := filemgr
-APPTITLE     := File Manager Beta
-APPID        := FILEB
+APPTITLE     := File Manager
+APPID        := FILEM
 APPMOD       := $(TARGET).d01
 
 SOURCEDIR    := src
