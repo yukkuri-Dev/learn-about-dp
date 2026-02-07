@@ -38,8 +38,8 @@ GPL-2.0 でライセンスされている [Gnuboy EX](https://github.com/brijohn
 - [ ] display file size 
 - [x] navigate into folders
 - [x] create file 
-- [ ] create/delete folders 
+- [ ] create folders 
 - [ ] rename files/folders 
 - [ ] copy files/folders 
 - [ ] move files/folders 
-- [ ] delete files/folders 
+- [x] delete files/folders 
