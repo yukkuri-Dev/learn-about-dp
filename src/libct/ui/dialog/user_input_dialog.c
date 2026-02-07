@@ -168,7 +168,6 @@ int konami_command_warn_dialog(void){
              "Proceed only if you understand the risks involved.",
              create_rgb16(255, 0, 0));
 
-    render_text_utf8_jpn(0,0,"ァィゥ");
     lcdc_copy_vram();
 
     /* Require the sequence: UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, ENTER */
