@@ -191,8 +191,18 @@ int main(void) {
                       prev_selected_index = 0;
                       scroll_offset = 0;
 
-                      // pathを更新
-                      strcpy(path, new_search_path);
+                      // pathを更新: 再割り当てしてからコピーする
+                      {
+                          size_t needed = strlen(new_search_path) + 1;
+                          char *new_path = (char *)memmgr_alloc(needed);
+                          if (new_path != NULL) {
+                              strcpy(new_path, new_search_path);
+                              if (path != NULL) {
+                                  memmgr_free(path);
+                              }
+                              path = new_path;
+                          }
+                      }
                       memmgr_free(new_search_path);
 
                       // 画面全体を再描画
