@@ -793,29 +793,65 @@ void render_text_jpn_halfwidth(uint16_t x, uint16_t y, const uint8_t *text)
 static uint32_t utf8_next(const char **p)
 {
     const unsigned char *s = (const unsigned char *)*p;
+    uint32_t cp;
+
+    /* End of string */
     if (*s == '\0')
         return 0;
+
+    /* ASCII fast path */
     if (*s < 0x80) {
-        uint32_t cp = *s;
+        cp = *s;
         (*p)++;
         return cp;
     }
+
+    /* 2-byte sequence: 110xxxxx 10xxxxxx */
     if ((s[0] & 0xE0) == 0xC0) {
-        uint32_t cp = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+        if (s[1] == '\0' || (s[1] & 0xC0) != 0x80) {
+            /* Truncated or invalid continuation */
+            (*p)++;
+            return 0;
+        }
+        cp = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
         (*p) += 2;
         return cp;
     }
+
+    /* 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx */
     if ((s[0] & 0xF0) == 0xE0) {
-        uint32_t cp = ((s[0] & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+        if (s[1] == '\0' || s[2] == '\0' ||
+            (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) {
+            /* Truncated or invalid continuation */
+            (*p)++;
+            return 0;
+        }
+        cp = ((s[0] & 0x0F) << 12) |
+             ((s[1] & 0x3F) << 6) |
+             (s[2] & 0x3F);
         (*p) += 3;
         return cp;
     }
+
+    /* 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
     if ((s[0] & 0xF8) == 0xF0) {
-        uint32_t cp = ((s[0] & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+        if (s[1] == '\0' || s[2] == '\0' || s[3] == '\0' ||
+            (s[1] & 0xC0) != 0x80 ||
+            (s[2] & 0xC0) != 0x80 ||
+            (s[3] & 0xC0) != 0x80) {
+            /* Truncated or invalid continuation */
+            (*p)++;
+            return 0;
+        }
+        cp = ((s[0] & 0x07) << 18) |
+             ((s[1] & 0x3F) << 12) |
+             ((s[2] & 0x3F) << 6) |
+             (s[3] & 0x3F);
         (*p) += 4;
         return cp;
     }
-    /* invalid sequence: skip one byte */
+
+    /* invalid leading byte: skip one */
     (*p)++;
     return 0;
 }
