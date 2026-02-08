@@ -20,6 +20,15 @@ int yes_or_no_dialog(const char *message,uint16_t color);
 void popup_dialog(const char *message,uint16_t color);
 
 /**
+ * @brief ユーザーに情報リストを表示するダイアログを表示する。
+ * @param names 表示する情報名の配列。 
+ * @param count 配列内の情報名の数。
+ * @note ユーザーがENTERキーまたはBACKキーを押すまで表示される。
+ */
+void info_list(const char **names, int count);
+
+
+/**
  * @brief ユーザーにこの操作にはリスクが伴うことを表示する。
  * @note konamiコードの入力を待ち、正しく入力された場合にのみ戻る。
  * @return 正しく入力された場合は0、キャンセルされた場合は1を返す。

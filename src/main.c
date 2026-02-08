@@ -12,6 +12,7 @@
 #include <libct/fsc/fs-control.h>
 #include <libct/input.h>
 #include <libct/ui/dialog/user_input_dialog.h>
+#include <libct/ui/dialog/user_select_dialog.h>
 #define SCREEN_WIDTH 528
 #define SCREEN_HEIGHT 320
 #define MAX_DISPLAY 15  // 画面に表示する最大ファイル数
@@ -133,9 +134,9 @@ int main(void) {
     }
     
     // 終了メッセージ
-    ct_print((SCREEN_WIDTH - strlen("Press POWER to exit. Press BACK to root.") * fnt->width) / 2,
+    ct_print((SCREEN_WIDTH - strlen("Press POWER to exit. BACK to root. H to Help.") * fnt->width) / 2,
      SCREEN_HEIGHT - fnt->height - 10,
-     "Press POWER to exit. Press BACK to root.",
+     "Press POWER to exit. BACK to root. H to Help.",
      create_rgb16(0, 255, 0));
     
     // 初期カーソルを描画
@@ -145,22 +146,16 @@ int main(void) {
     
     // VRAMにコピー（画面に反映）
     lcdc_copy_vram();
-    
-
-
-
-
-
 
     // 入力待機ループ
     while (1) {
         keypad_read();
-        if (get_key_state(KEY_POWER)) {
+        if (get_key_state(KEY_POWER)) {// プログラム終了
             memmgr_free(path);
             if (current_files.entries) memmgr_free(current_files.entries);
             return -2;
         }
-        if (get_key_state(KEY_BACK)){
+        if (get_key_state(KEY_BACK)){// ルートディレクトリに戻る
           return 0;
         }
         if (get_key_state(KEY_ENTER)){
@@ -237,7 +232,7 @@ int main(void) {
               keypad_read();
           }
         }
-        if (get_key_state(KEY_UP)){
+        if (get_key_state(KEY_UP)){// 上キーで選択を移動
           if (selected_index > 0) {
               prev_selected_index = selected_index;
               selected_index--;
@@ -256,7 +251,7 @@ int main(void) {
               }
           }
         }
-        if (get_key_state(KEY_DOWN)){
+        if (get_key_state(KEY_DOWN)){// 下キーで選択を移動
           if (selected_index < current_files.count - 1) {
               prev_selected_index = selected_index;
               selected_index++;
@@ -276,7 +271,12 @@ int main(void) {
               
           }
         }
-        if (get_key_state(KEY_RIGHT)){
+        if (get_key_state(KEY_RIGHT)){// 新しい要素を作成
+            const char *items[] = {
+                "Create File",
+                "Create Directory",
+            };
+            int sel = user_select_dialog(items, 2);
             char *file_name = user_input_dialog();
             if (file_name == NULL) {
                 ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation cancelled.", create_rgb16(255,0,0));
@@ -294,7 +294,14 @@ int main(void) {
                 }
                 return 0;
             }
-            int rc = file_create(path, file_name);
+            int rc = -1;
+            if (sel == 1) {
+                // ディレクトリ作成
+                rc = directory_create(path, file_name);
+            }else {
+                rc = file_create(path, file_name);
+            }
+
             if (rc < 0){
               ct_print(10, SCREEN_HEIGHT - fnt->height - 40, "File creation failed!", create_rgb16(255,0,0));
             } else {
@@ -324,8 +331,7 @@ int main(void) {
             }
             return 0;
         }
-        if (get_key_state(KEY_BACKSPACE)){
-            // 選択されたファイルを削除
+        if (get_key_state(KEY_BACKSPACE)){// 選択されたファイルを削除
             char *selected_full = get_selected_fullpath(path);
             if (selected_full == NULL) {
                 popup_dialog("No file selected!", create_rgb16(255, 0, 0));
@@ -381,8 +387,7 @@ int main(void) {
             }
             return 0;
         }
-        if (get_key_state(KEY_LEFT)){
-          // ドライブ切り替え（SDカード）
+        if (get_key_state(KEY_LEFT)){// ドライブ切り替え（SDカード）
           /* Ensure 'path' buffer is large enough for drive[1] and '*' */
           {
               size_t needed = strlen(drive[1]) + strlen("*") + 1; /* drive + '*' + '\0' */
@@ -440,7 +445,28 @@ int main(void) {
               keypad_read();
           }
         }
-        if (refresh_needed) {
+        if (get_key_state(KEY_CHAR_H)){//ヘルプ表示
+            const char *items[] = {
+                "=== Help ===",
+                "[H] Show Help",
+                "[UP/DOWN] Move Cursor",
+                "[ENTER] Select File/Enter Directory",
+                "[BACK] Go to Root Directory",
+                "[LEFT] Switch to SD Card",
+                "[RIGHT] Create File/Directory",
+                "[BACKSPACE] Delete Selected File/Directory",
+                "[POWER] Exit Application",
+            };
+            info_list(items, 9);
+          refresh_needed = 1;
+          lcdc_copy_vram();
+          while (get_key_state(KEY_CHAR_H))
+          {
+              keypad_read();
+          }
+          return 0;
+        }
+        if (refresh_needed) {// 画面を更新
             // 前のカーソルを消去（黒で上書き）
             int prev_screen_pos = prev_selected_index - scroll_offset;
             if (prev_screen_pos >= 0 && prev_screen_pos < MAX_DISPLAY) {
