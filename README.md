@@ -33,12 +33,12 @@ GPL-2.0 でライセンスされている [Gnuboy EX](https://github.com/brijohn
 事実、私だってAIをガッツリ利用してる初心者ですから!
 ---
 # Progress
+- [x] show help
 - [x] get file type and folder display properly
 - [ ] Code sharing (library creation) 
 - [ ] display file size 
 - [x] navigate into folders
-- [x] create file 
-- [ ] create folders 
+- [x] create file / folders 
 - [ ] rename files/folders 
 - [ ] copy files/folders 
 - [ ] move files/folders 
